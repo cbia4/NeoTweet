@@ -3,7 +3,7 @@ import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
 
 import java.util.*;
-import java.io.*;
+
 
 import javax.ws.rs.core.MediaType;
 
@@ -25,17 +25,21 @@ public class NeoClient {
         response.close();
         */
 
-        System.out.println("TESTING");
+        Scanner sc = new Scanner(System.in);
 
+        System.out.println("Welcome to the Neo4j client!");
+        System.out.println("NOTE: Make sure to use single quotes when typing queries!");
+        String query = "";
 
+        while(!query.equals("quit")) {
+            System.out.print("> ");
+            query = sc.nextLine();
 
+            if(!query.equals("quit"))
+                System.out.println();
+                cypherQuery(query);
 
-
-
-
-
-
-
+        }
 
     }
 
@@ -60,6 +64,8 @@ public class NeoClient {
                 payload, txUri, response.getStatus(),
                 response.getEntity( String.class )
         ));
+
+        System.out.println();
 
         response.close();
 
