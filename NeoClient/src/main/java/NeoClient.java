@@ -35,9 +35,10 @@ public class NeoClient {
             System.out.print("> ");
             query = sc.nextLine();
 
-            if(!query.equals("quit"))
+            if(!query.equals("quit")) {
                 System.out.println();
                 cypherQuery(query);
+            }
 
         }
 
@@ -45,7 +46,7 @@ public class NeoClient {
 
     public static void cypherQuery(final String query) {
 
-        final String txUri = SERVER_ROOT_URI + "transaction/commit";
+        final String txUri = SERVER_ROOT_URI + "transaction/commit/";
 
         // Establish connection to the resource
         WebResource resource = Client.create().resource(txUri);
