@@ -1,116 +1,67 @@
-import com.sun.jersey.api.client.Client;
-import com.sun.jersey.api.client.ClientResponse;
-import com.sun.jersey.api.client.WebResource;
+
 import java.util.*;
-import javax.ws.rs.core.MediaType;
+
+
 
 
 public class NeoClient {
-    // Base URI to listen to
-    public static final String SERVER_ROOT_URI = "http://localhost:7474/db/data/";
 
     public static void main(String[] args) {
 
-
+        TxHandler neoTx = new TxHandler();
         Scanner sc = new Scanner(System.in);
-        String query = "";
+        String input = "";
+        String[] inputSplit;
 
-        System.out.println("Welcome to the Neo4j client!");
-        System.out.println("NOTE: Make sure to use single quotes when typing queries!");
+        System.out.println("-----------------------------------");
+        System.out.println("Welcome to the Neo4j Client!");
+        System.out.println("Options:");
+        System.out.println("ADD <name> <age>");
+        System.out.println("DELETE <name>");
+        System.out.println("UPDATE <oldname> <newname> <newage>");
+        System.out.println("READ <name>");
+        System.out.println("QUERY (cypher query)");
+        System.out.println("EXIT (quit client)");
+        System.out.println("-----------------------------------");
+        System.out.println();
 
-
-        while(!query.equals("quit")) {
+        while(!input.equals("EXIT")) {
             System.out.print("> ");
-            query = sc.nextLine();
+            input = sc.nextLine();
+            inputSplit = input.split(" ");
 
-            if(!query.equals("quit")) {
-                System.out.println();
-                cypherQuery(query);
+            if( inputSplit[0].equals("ADD") ) {
+                neoTx.add(inputSplit[1],inputSplit[2]);
             }
+
+            else if( inputSplit[0].equals("DELETE") ) {
+                neoTx.delete(inputSplit[1]);
+            }
+
+            else if( inputSplit[0].equals("UPDATE") ) {
+                neoTx.update(inputSplit[1], inputSplit[2], inputSplit[3]);
+            }
+
+            else if( inputSplit[0].equals("READ") ) {
+                neoTx.read(inputSplit[1]);
+            }
+
+            else if ( inputSplit[0].equals("QUERY") ) {
+                System.out.print("----> ");
+                input = sc.nextLine();
+                neoTx.query(input);
+            }
+
+            else {
+                if(!inputSplit[0].equals("EXIT")) {
+                    System.out.println("Error: Invalid input!");
+                }
+            }
+
+
 
         }
 
-
-        java.net.URI firstNode = createNode();
-        addProperty(firstNode, "name", "Colin Biafore");
-
-    }
-
-    public static void cypherQuery(final String query) {
-
-        final String txUri = SERVER_ROOT_URI + "transaction/commit/";
-
-        // Establish connection to the resource
-        WebResource resource = Client.create().resource(txUri);
-
-        // Create data to send
-        String payload = "{\"statements\" : [ {\"statement\" : \"" + query + "\"} ]}";
-
-        // POST
-        ClientResponse response = resource
-                .accept( MediaType.APPLICATION_JSON )
-                .type( MediaType.APPLICATION_JSON)
-                .entity( payload )
-                .post( ClientResponse.class );
-
-        System.out.println( String.format(
-                "POST [%s] to [%s], status code [%d], returned data: " + System.lineSeparator() + "%s",
-                payload, txUri, response.getStatus(),
-                response.getEntity( String.class ) ));
-
-        System.out.println();
-
-        response.close();
-
-
-
-    }
-
-    public static java.net.URI createNode() {
-
-        final String nodeEntryPointUri = SERVER_ROOT_URI + "node/";
-
-        WebResource resource = Client.create()
-                .resource( nodeEntryPointUri );
-
-        // POST {} to the node entry point URI
-        ClientResponse response = resource
-                .accept( MediaType.APPLICATION_JSON )
-                .type( MediaType.APPLICATION_JSON )
-                .entity( "{}" )
-                .post( ClientResponse.class );
-
-        final java.net.URI location = response.getLocation();
-
-        System.out.println(String.format(
-                "POST to [%s], status code[%d], location header [%s]",
-                nodeEntryPointUri, response.getStatus(), location.toString() ));
-
-        response.close();
-
-        return location;
-
-    }
-
-    public static void addProperty(java.net.URI nodeUri, String propertyName, String propertyValue) {
-
-        String propertyUri = nodeUri.toString() + "/properties/" + propertyName;
-        // http://localhost:7474/db/data/node/{node_id}/properties/{property_name}
-
-        WebResource resource = Client.create()
-                .resource( propertyUri );
-
-        ClientResponse response = resource
-                .accept( MediaType.APPLICATION_JSON )
-                .type(MediaType.APPLICATION_JSON)
-                .entity( "\"" + propertyValue + "\"")
-                .put( ClientResponse.class );
-
-        System.out.println( String.format(
-                "PUT to [%s], status code [%d]",
-                propertyUri, response.getStatus() ));
-
-        response.close();
 
     }
 
