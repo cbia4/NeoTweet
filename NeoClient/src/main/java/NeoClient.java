@@ -13,7 +13,7 @@ public class NeoClient {
         String input = "";
         String[] inputSplit;
 
-        System.out.println("-----------------------------------");
+        System.out.println("--------------------------------------------");
         System.out.println("Welcome to the Neo4j Client!");
         System.out.println("Options:");
         System.out.println("ADD <name> <age>");
@@ -25,7 +25,7 @@ public class NeoClient {
         System.out.println("READALL (read all nodes)");
         System.out.println("QUERY (cypher query)");
         System.out.println("EXIT (quit client)");
-        System.out.println("-----------------------------------");
+        System.out.println("--------------------------------------------");
         System.out.println();
 
         while(!input.equals("EXIT")) {
@@ -58,7 +58,10 @@ public class NeoClient {
             }
 
             else if( inputSplit[0].equals("READALL") ) {
+                System.out.println("NODES:");
                 neoTx.query("MATCH (n) RETURN n;");
+                System.out.println("RELATIONSHIPS:");
+                neoTx.query("MATCH (n)-[r]->() RETURN r;");
             }
 
             else if ( inputSplit[0].equals("QUERY") ) {

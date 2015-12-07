@@ -34,11 +34,16 @@ public class TxHandler {
                 .post( ClientResponse.class );
 
 
+        /*
         System.out.println( String.format(
                 "POST [%s] to [%s], status code [%d], returned data: " + System.lineSeparator() + "%s",
                 payload, txUri, response.getStatus(),
                 response.getEntity( String.class ) ));
 
+        */
+
+
+        System.out.println( response.getEntity( String.class) );
 
         /*
         if(response.getStatus() == 200) {
@@ -78,10 +83,12 @@ public class TxHandler {
     }
 
     public void addRel(final String name1, final String relType, final String name2) {
+
         final String query = "MATCH (a:Person),(b:Person) " +
                 "WHERE a.name = '" + name1 + "' AND b.name = '" + name2 + "' " +
-                "CREATE (a)-[r:" + relType + "]->(b) " +
+                "CREATE (a)-[r:" + relType + " {name: a.name + '-[" + relType + "]->' + b.name}]->(b) " +
                 "RETURN r;";
+
         send(query);
     }
 
@@ -98,8 +105,13 @@ public class TxHandler {
     }
 
     public void read(final String name) {
-        final String query = "MATCH (n:Person {name:'" + name + "'}) RETURN n;";
-        send(query);
+        System.out.println("NODES:");
+        final String query1 = "MATCH (n:Person {name:'" + name + "'}) RETURN n;";
+        send(query1);
+
+        System.out.println("RELATIONSHIPS:");
+        final String query2 = "MATCH (n:Person {name:'" + name + "'})-[r]->() RETURN r;";
+        send(query2);
     }
 
 
