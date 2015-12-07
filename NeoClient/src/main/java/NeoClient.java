@@ -17,16 +17,19 @@ public class NeoClient {
         System.out.println("Welcome to the Neo4j Client!");
         System.out.println("Options:");
         System.out.println("ADD <name> <age>");
+        System.out.println("ADDREL <name1> <RELTYPE> <name2>");
         System.out.println("DELETE <name>");
+        System.out.println("DELALL (delete all nodes and rels)");
         System.out.println("UPDATE <oldname> <newname> <newage>");
         System.out.println("READ <name>");
+        System.out.println("READALL (read all nodes)");
         System.out.println("QUERY (cypher query)");
         System.out.println("EXIT (quit client)");
         System.out.println("-----------------------------------");
         System.out.println();
 
         while(!input.equals("EXIT")) {
-            System.out.print("> ");
+            System.out.print("-> ");
             input = sc.nextLine();
             inputSplit = input.split(" ");
 
@@ -34,8 +37,16 @@ public class NeoClient {
                 neoTx.add(inputSplit[1],inputSplit[2]);
             }
 
+            else if( inputSplit[0].equals("ADDREL") ) {
+                neoTx.addRel(inputSplit[1], inputSplit[2], inputSplit[3]);
+            }
+
             else if( inputSplit[0].equals("DELETE") ) {
                 neoTx.delete(inputSplit[1]);
+            }
+
+            else if( inputSplit[0].equals("DELALL") ) {
+                neoTx.query("MATCH (n) DETACH DELETE n;");
             }
 
             else if( inputSplit[0].equals("UPDATE") ) {
@@ -46,8 +57,12 @@ public class NeoClient {
                 neoTx.read(inputSplit[1]);
             }
 
+            else if( inputSplit[0].equals("READALL") ) {
+                neoTx.query("MATCH (n) RETURN n;");
+            }
+
             else if ( inputSplit[0].equals("QUERY") ) {
-                System.out.print("----> ");
+                System.out.print("--> ");
                 input = sc.nextLine();
                 neoTx.query(input);
             }
@@ -57,9 +72,6 @@ public class NeoClient {
                     System.out.println("Error: Invalid input!");
                 }
             }
-
-
-
         }
 
 
