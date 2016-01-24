@@ -1,6 +1,10 @@
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 //import java.util.*;
 
@@ -16,6 +20,32 @@ public class TxHandler {
         this.SERVER_ROOT_URI = "http://localhost:7474/db/data/";
     }
 
+    private void printResult(String neoResponse) {
+
+        JSONParser parser = new JSONParser();
+
+        try {
+            Object obj = parser.parse(neoResponse);
+            JSONObject jsonObject = (JSONObject)obj;
+            JSONArray results = (JSONArray)jsonObject.get("results");
+            JSONObject data = (JSONObject)results.get(0);
+            JSONArray dataArray = (JSONArray)data.get("data");
+
+            for(int i = 0; i < dataArray.size(); i++) {
+                JSONObject row = (JSONObject)dataArray.get(i);
+                JSONArray dataInRow = (JSONArray)row.get("row");
+                JSONObject info = (JSONObject)dataInRow.get(0);
+                String name = info.get("name").toString();
+                String ageString = info.get("age").toString();
+                int age = Integer.parseInt(ageString);
+                System.out.println("Name: " + name + " Age: " + age);
+            }
+        } catch(ParseException pe) {
+            pe.printStackTrace();
+        }
+    }
+
+    //@SuppressWarnings("unchecked")
     private void send(final String query) {
 
         /* Set the transaction URI */
@@ -42,7 +72,7 @@ public class TxHandler {
             System.out.println("ERROR. Status: " + status);
         } else {
             String neoResponse = response.getEntity(String.class);
-            System.out.println("Response: " + neoResponse);
+            printResult(neoResponse);
         }
 
         System.out.println();

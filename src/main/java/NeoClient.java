@@ -3,7 +3,6 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
-import java.io.FileReader;
 import java.util.*;
 
 
@@ -83,45 +82,10 @@ public class NeoClient {
         }
     }
 
+
     public static void main(String[] args) {
 
-        JSONObject obj = new JSONObject();
-        obj.put("name", "neo4tweet");
-        obj.put("release", new Integer(2016));
-
-        JSONArray list = new JSONArray();
-        list.add("tweet1");
-        list.add("tweet2");
-        list.add("tweet3");
-
-        obj.put("tweets", list);
-
-
-        System.out.println(obj);
-
-        JSONParser parser = new JSONParser();
-
-        try {
-            Object obj2 = parser.parse(obj.toString());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        JSONObject jsonObject = (JSONObject) obj;
-
-        String name = (String) jsonObject.get("name");
-        System.out.println(name);
-
-        int age = (Integer) jsonObject.get("release");
-
-        System.out.println(age);
-
-        JSONArray tweets = (JSONArray) jsonObject.get("tweets");
-
-        Iterator<String> iterator = tweets.iterator();
-        while(iterator.hasNext()) {
-            System.out.println(iterator.next());
-        }
+        getInput();
 
     }
 
