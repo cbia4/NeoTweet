@@ -18,58 +18,34 @@ public class TxHandler {
 
     private void send(final String query) {
 
+        /* Set the transaction URI */
         final String txUri = SERVER_ROOT_URI + "transaction/commit/";
 
-
-        // Establish connection to the resource
+        /* Establish connection with neo4j */
         WebResource resource = Client.create().resource(txUri);
 
-        // Create data to send
+        /* Put query into json format */
         String payload = "{\"statements\" : [ {\"statement\" : \"" + query + "\"} ]}";
 
-        // POST
+        /* POST event */
         ClientResponse response = resource
                 .accept( MediaType.APPLICATION_JSON )
                 .type( MediaType.APPLICATION_JSON)
                 .entity( payload )
                 .post( ClientResponse.class );
 
+        /* Capture response status */
+        int status = response.getStatus();
 
-        /*
-        System.out.println( String.format(
-                "POST [%s] to [%s], status code [%d], returned data: " + System.lineSeparator() + "%s",
-                payload, txUri, response.getStatus(),
-                response.getEntity( String.class ) ));
-
-        */
-
-        String neoResponse = response.getEntity( String.class );
-        System.out.println(neoResponse);
-
-
-
-        /*
-        if(response.getStatus() == 200) {
-            System.out.println("Query successful.");
-
-
-            String data = response.getEntity( String.class );
-            System.out.println("Results:");
-            String result = data.substring(39, data.length() - 15);
-            System.out.println(result);
-
-
+        /* Print status or neo4j response */
+        if(status != 200) {
+            System.out.println("ERROR. Status: " + status);
         } else {
-            System.out.println( String.format(
-                    "POST [%s] to [%s], status code [%d], returned data: " + System.lineSeparator() + "%s",
-                    payload, txUri, response.getStatus(),
-                    response.getEntity( String.class ) ));
+            String neoResponse = response.getEntity(String.class);
+            System.out.println("Response: " + neoResponse);
         }
 
-        */
-
         System.out.println();
-
         response.close();
 
     }
@@ -77,7 +53,6 @@ public class TxHandler {
     public void query(final String query) {
         send(query);
     }
-
 
     public void add(final String name, final String ageStr) {
         int age = Integer.parseInt(ageStr);
@@ -94,7 +69,6 @@ public class TxHandler {
 
         send(query);
     }
-
 
     public void delete(final String name) {
         final String query = "MATCH (n:Person {name:'" + name + "'}) DETACH DELETE n;";
@@ -116,8 +90,5 @@ public class TxHandler {
         final String query2 = "MATCH (n:Person {name:'" + name + "'})-[r]->() RETURN r;";
         send(query2);
     }
-
-
-
 
 }
