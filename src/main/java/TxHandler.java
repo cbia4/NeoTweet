@@ -1,14 +1,22 @@
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
+
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-//import java.util.*;
-
 import javax.ws.rs.core.MediaType;
+
+
+/*
+ * A class to manage interaction with the Neo4j server
+ *
+
+
+ */
+
 
 
 public class TxHandler {
@@ -35,10 +43,12 @@ public class TxHandler {
                 JSONObject row = (JSONObject)dataArray.get(i);
                 JSONArray dataInRow = (JSONArray)row.get("row");
                 JSONObject info = (JSONObject)dataInRow.get(0);
-                String name = info.get("name").toString();
-                String ageString = info.get("age").toString();
-                int age = Integer.parseInt(ageString);
-                System.out.println("Name: " + name + " Age: " + age);
+                String tweet = info.get("tweet").toString();
+                //String userAge = info.get("age").toString();
+                //int age = Integer.parseInt(userAge);
+                System.out.println("Tweet: " + tweet);
+                //System.out.println(" Age: " + age);
+                System.out.println("------------------------");
             }
         } catch(ParseException pe) {
             pe.printStackTrace();
@@ -72,6 +82,8 @@ public class TxHandler {
             System.out.println("ERROR. Status: " + status);
         } else {
             String neoResponse = response.getEntity(String.class);
+            System.out.println("------------------------");
+            System.out.println(neoResponse);
             printResult(neoResponse);
         }
 
@@ -113,7 +125,7 @@ public class TxHandler {
 
     public void read(final String name) {
         System.out.println("NODES:");
-        final String query1 = "MATCH (n:Person {name:'" + name + "'}) RETURN n;";
+        final String query1 = "MATCH (n:Person {user_name:'" + name + "'}) RETURN n;";
         send(query1);
 
         System.out.println("RELATIONSHIPS:");

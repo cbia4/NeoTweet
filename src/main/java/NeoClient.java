@@ -1,7 +1,4 @@
 
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
 
 import java.util.*;
 
@@ -10,15 +7,16 @@ import java.util.*;
 
 public class NeoClient {
 
-    public static void getInput() {
+    private TxHandler neoTx;
+    private Scanner sc;
+    private String input;
 
-        TxHandler neoTx = new TxHandler();
-        Scanner sc = new Scanner(System.in);
-        String input = "";
-        String[] inputSplit;
+    public NeoClient() {
 
+        neoTx = new TxHandler();
+        sc = new Scanner(System.in);
+        input = "";
         System.out.println("--------------------------------------------");
-        System.out.println("Welcome to the Neo4j Client!");
         System.out.println("Options:");
         System.out.println("ADD <name> <age>");
         System.out.println("ADDREL <name1> <RELTYPE> <name2>");
@@ -31,6 +29,13 @@ public class NeoClient {
         System.out.println("EXIT (quit client)");
         System.out.println("--------------------------------------------");
         System.out.println();
+
+    }
+
+    public void getInput() {
+
+        String[] inputSplit;
+
 
         while(!input.equals("EXIT")) {
             System.out.print("-> ");
@@ -80,13 +85,6 @@ public class NeoClient {
                 }
             }
         }
-    }
-
-
-    public static void main(String[] args) {
-
-        getInput();
-
     }
 
 }
