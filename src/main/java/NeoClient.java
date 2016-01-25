@@ -10,14 +10,17 @@ public class NeoClient {
     private TxHandler neoTx;
     private Scanner sc;
     private String input;
+    private TwitterStream stream;
 
     public NeoClient() {
 
         neoTx = new TxHandler();
         sc = new Scanner(System.in);
+        stream = new TwitterStream();
         input = "";
         System.out.println("--------------------------------------------");
         System.out.println("Options:");
+        System.out.println("FETCH <count>");
         System.out.println("ADD <name> <age>");
         System.out.println("ADDREL <name1> <RELTYPE> <name2>");
         System.out.println("DELETE <name>");
@@ -44,6 +47,10 @@ public class NeoClient {
 
             if( inputSplit[0].equals("ADD") ) {
                 neoTx.add(inputSplit[1],inputSplit[2]);
+            }
+
+            else if( inputSplit[0].equals("FETCH") ) {
+                stream.fetch(inputSplit[1]);
             }
 
             else if( inputSplit[0].equals("ADDREL") ) {

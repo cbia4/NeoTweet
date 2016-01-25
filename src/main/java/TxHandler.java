@@ -10,27 +10,25 @@ import org.json.simple.parser.ParseException;
 import javax.ws.rs.core.MediaType;
 
 
-/*
+/**
  * A class to manage interaction with the Neo4j server
- *
-
-
  */
-
-
 
 public class TxHandler {
 
     final private String SERVER_ROOT_URI;
+    private static JSONParser parser;
 
+    /* TxHandler Constructor */
     public TxHandler() {
 
         this.SERVER_ROOT_URI = "http://localhost:7474/db/data/";
+        parser = new JSONParser();
+
     }
 
-    private void printResult(String neoResponse) {
-
-        JSONParser parser = new JSONParser();
+    /* Parses neo4j response */
+    private void parseResponse(String neoResponse) {
 
         try {
             Object obj = parser.parse(neoResponse);
@@ -55,8 +53,8 @@ public class TxHandler {
         }
     }
 
-    //@SuppressWarnings("unchecked")
-    private void send(final String query) {
+    /* Send a query to cypher */
+    public void send(final String query) {
 
         /* Set the transaction URI */
         final String txUri = SERVER_ROOT_URI + "transaction/commit/";
@@ -82,26 +80,26 @@ public class TxHandler {
             System.out.println("ERROR. Status: " + status);
         } else {
             String neoResponse = response.getEntity(String.class);
-            System.out.println("------------------------");
-            System.out.println(neoResponse);
-            printResult(neoResponse);
         }
 
-        System.out.println();
+        //System.out.println();
         response.close();
 
     }
 
+    /* Send a query in cypher syntax to neo4j */
     public void query(final String query) {
         send(query);
     }
 
+    /* Add a name and an age */
     public void add(final String name, final String ageStr) {
         int age = Integer.parseInt(ageStr);
         final String query = "CREATE (n:Person {name:'" + name + "', age:" + age + "}) RETURN n;";
         send(query);
     }
 
+    /* Connect one node to another by name */
     public void addRel(final String name1, final String relType, final String name2) {
 
         final String query = "MATCH (a:Person),(b:Person) " +
@@ -112,17 +110,20 @@ public class TxHandler {
         send(query);
     }
 
+    /* Delete a node matching the specified name */
     public void delete(final String name) {
         final String query = "MATCH (n:Person {name:'" + name + "'}) DETACH DELETE n;";
         send(query);
     }
 
+    /* Update an nodes name and age */
     public void update(final String oldName, final String newName, final String newAge) {
         int age = Integer.parseInt(newAge);
         final String query = "MATCH (n:Person {name:'" + oldName + "'}) SET n.name = '" + newName + "', n.age = " + age + " RETURN n;";
         send(query);
     }
 
+    /* Get all nodes with the specified name */
     public void read(final String name) {
         System.out.println("NODES:");
         final String query1 = "MATCH (n:Person {user_name:'" + name + "'}) RETURN n;";

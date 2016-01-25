@@ -98,7 +98,6 @@ public class TwitterStream {
         StatusesSampleEndpoint endpoint = new StatusesSampleEndpoint();
         endpoint.stallWarnings(false);
 
-
         /* Create a new BasicClient. By default gzip is enabled. */
         BasicClient client = new ClientBuilder()
                 .name("sampleExampleClient")
