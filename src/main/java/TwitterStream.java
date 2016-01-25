@@ -28,41 +28,21 @@ public class TwitterStream {
 
     /* Adds a Name, Timezone, and Tweet to neo4j */
     private void addToDB(String msg) {
+
         try {
             Object obj = parser.parse(msg);
 
             JSONObject jsonObject = (JSONObject)obj;
             JSONObject userObject = (JSONObject) jsonObject.get("user");
 
-            JSONObject entityObject = (JSONObject) jsonObject.get("entities");
-            JSONArray hashtagArray = (JSONArray)entityObject.get("hashtags");
-
             String tweet = jsonObject.get("text").toString();
             String userName = userObject.get("name").toString();
             String timeZone = userObject.get("time_zone").toString();
 
+            final String createQuerry = "CREATE (n:Person {name:'" + userName + "', time_zone:'" + timeZone + "', tweet:'" + tweet + "'}) RETURN n;";
 
-            /*
-            System.out.println("Adding tweet: " + tweet);
-            System.out.println("Name: " + userName);
-            System.out.println("Timezone: " + timeZone);
-            System.out.println("Hashtags:");
-
-
-            if(hashtagArray.size() == 0) {
-                System.out.println("None");
-            } else {
-                for(int i = 0; i < hashtagArray.size(); i++) {
-                    System.out.println(hashtagArray.get(i).toString());
-                }
-            }
-            */
-
-            final String query = "CREATE (n:Person {name:'" + userName + "', time_zone:'" + timeZone + "', tweet:'" + tweet + "'}) RETURN n;";
-
-            neoTx.send(query);
+            neoTx.query(createQuerry);
             amountAdded++;
-
 
         } catch(ParseException pe) {
             pe.printStackTrace();
@@ -99,7 +79,7 @@ public class TwitterStream {
         endpoint.stallWarnings(false);
 
         /* Create a new BasicClient. By default gzip is enabled. */
-        BasicClient client = new ClientBuilder()
+        BasicClient client = new ClientBuilder() // THIS LINE CAUSES AN ERROR with SLF4J
                 .name("sampleExampleClient")
                 .hosts(Constants.STREAM_HOST)
                 .endpoint(endpoint)

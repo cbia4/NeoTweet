@@ -31,8 +31,10 @@ public class TxHandler {
     private void parseResponse(String neoResponse) {
 
         try {
+
             Object obj = parser.parse(neoResponse);
             JSONObject jsonObject = (JSONObject)obj;
+
             JSONArray results = (JSONArray)jsonObject.get("results");
             JSONObject data = (JSONObject)results.get(0);
             JSONArray dataArray = (JSONArray)data.get("data");
@@ -54,7 +56,9 @@ public class TxHandler {
     }
 
     /* Send a query to cypher */
-    public void send(final String query) {
+    private void send(final String query) {
+
+        System.out.println("Sending query...");
 
         /* Set the transaction URI */
         final String txUri = SERVER_ROOT_URI + "transaction/commit/";
@@ -80,12 +84,16 @@ public class TxHandler {
             System.out.println("ERROR. Status: " + status);
         } else {
             String neoResponse = response.getEntity(String.class);
+            System.out.println("Response: " + neoResponse);
+            //parseResponse(neoResponse);
         }
 
         //System.out.println();
         response.close();
 
     }
+
+    // TODO: Update client input options
 
     /* Send a query in cypher syntax to neo4j */
     public void query(final String query) {
@@ -126,7 +134,7 @@ public class TxHandler {
     /* Get all nodes with the specified name */
     public void read(final String name) {
         System.out.println("NODES:");
-        final String query1 = "MATCH (n:Person {user_name:'" + name + "'}) RETURN n;";
+        final String query1 = "MATCH (n:Person {name:'" + name + "'}) RETURN n;";
         send(query1);
 
         System.out.println("RELATIONSHIPS:");

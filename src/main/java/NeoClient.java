@@ -21,13 +21,13 @@ public class NeoClient {
         System.out.println("--------------------------------------------");
         System.out.println("Options:");
         System.out.println("FETCH <count>");
-        System.out.println("ADD <name> <age>");
-        System.out.println("ADDREL <name1> <RELTYPE> <name2>");
-        System.out.println("DELETE <name>");
+        //System.out.println("ADD <name> <age>");
+        //System.out.println("ADDREL <name1> <RELTYPE> <name2>");
+        //System.out.println("DELETE <name>");
         System.out.println("DELALL (delete all nodes and rels)");
-        System.out.println("UPDATE <oldname> <newname> <newage>");
-        System.out.println("READ <name>");
-        System.out.println("READALL (read all nodes)");
+        //System.out.println("UPDATE <oldname> <newname> <newage>");
+        //System.out.println("READ <name>");
+        //System.out.println("READALL (read all nodes)");
         System.out.println("QUERY (cypher query)");
         System.out.println("EXIT (quit client)");
         System.out.println("--------------------------------------------");
@@ -35,6 +35,7 @@ public class NeoClient {
 
     }
 
+    // TODO: Update client input options
     public void getInput() {
 
         String[] inputSplit;
@@ -46,7 +47,8 @@ public class NeoClient {
             inputSplit = input.split(" ");
 
             if( inputSplit[0].equals("ADD") ) {
-                neoTx.add(inputSplit[1],inputSplit[2]);
+                //neoTx.add(inputSplit[1],inputSplit[2]);
+                System.out.println("Option disabled.");
             }
 
             else if( inputSplit[0].equals("FETCH") ) {
@@ -54,11 +56,13 @@ public class NeoClient {
             }
 
             else if( inputSplit[0].equals("ADDREL") ) {
-                neoTx.addRel(inputSplit[1], inputSplit[2], inputSplit[3]);
+                //neoTx.addRel(inputSplit[1], inputSplit[2], inputSplit[3]);
+                System.out.println("Option disabled.");
             }
 
             else if( inputSplit[0].equals("DELETE") ) {
-                neoTx.delete(inputSplit[1]);
+                //neoTx.delete(inputSplit[1]);
+                System.out.println("Option disabled.");
             }
 
             else if( inputSplit[0].equals("DELALL") ) {
@@ -66,18 +70,27 @@ public class NeoClient {
             }
 
             else if( inputSplit[0].equals("UPDATE") ) {
-                neoTx.update(inputSplit[1], inputSplit[2], inputSplit[3]);
+                //neoTx.update(inputSplit[1], inputSplit[2], inputSplit[3]);
+                System.out.println("Option disabled.");
             }
 
             else if( inputSplit[0].equals("READ") ) {
-                neoTx.read(inputSplit[1]);
+
+                //neoTx.read(inputSplit[1]);
+                System.out.println("Option disabled.");
             }
 
             else if( inputSplit[0].equals("READALL") ) {
+
+                /*
                 System.out.println("NODES:");
                 neoTx.query("MATCH (n) RETURN n;");
                 System.out.println("RELATIONSHIPS:");
                 neoTx.query("MATCH (n)-[r]->() RETURN r;");
+
+                */
+
+                System.out.println("Option disabled.");
             }
 
             else if ( inputSplit[0].equals("QUERY") ) {
