@@ -100,6 +100,17 @@ public class TwitterStream {
 
     }
 
+    private String getHashtags(JSONArray hashtagArray) {
+        String tagList = "";
+
+        for(int i = 0; i < hashtagArray.size(); i++) {
+            JSONObject hashtag = (JSONObject) hashtagArray.get(i);
+            tagList += hashtag.get("text").toString() + " ";
+        }
+
+        return tagList;
+    }
+
     private String convertToQuery(String msg) {
 
         String query = "";
@@ -117,15 +128,18 @@ public class TwitterStream {
 
             String userName = userObject.get("name").toString();
             String tweet = jsonObject.get("text").toString();
-            String place = placeObject.get("full_name").toString();
-            String hashtags = hashtagArray.toString();
+            String place = placeObject.get("name").toString();
+            String fullPlace = placeObject.get("full_name").toString();
             double longitude = (Double) coordArray.get(0);
             double latitude = (Double) coordArray.get(1);
 
+            String hashtags = getHashtags(hashtagArray);
+
             query = "CREATE (n:Tweet {name:'" + userName +
                     "', place:'" + place +
+                    "', full_place:'" + fullPlace +
                     "', tweet:'" + tweet +
-                    "', tags:'" + hashtags +
+                    "', hashtags:'" + hashtags +
                     "', latitude:" + latitude +
                     ", longitude:" + longitude +
                     "}) RETURN n;";
