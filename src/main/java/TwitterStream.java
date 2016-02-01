@@ -1,18 +1,23 @@
 import com.twitter.hbc.ClientBuilder;
 import com.twitter.hbc.core.Constants;
-import com.twitter.hbc.core.endpoint.StatusesSampleEndpoint;
+import com.twitter.hbc.core.endpoint.Location;
+import com.twitter.hbc.core.endpoint.StatusesFilterEndpoint;
 import com.twitter.hbc.core.processor.StringDelimitedProcessor;
 import com.twitter.hbc.httpclient.BasicClient;
 import com.twitter.hbc.httpclient.auth.Authentication;
 import com.twitter.hbc.httpclient.auth.OAuth1;
+
+
 import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+import org.json.simple.JSONObject;
 
+
+import java.util.ArrayList;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.TimeUnit;
+
 
 /**
  * Created by colinbiafore on 1/24/16.
@@ -24,32 +29,10 @@ public class TwitterStream {
     private static Authentication auth;
     private static JSONParser parser;
     private static TxHandler neoTx;
-    private int amountAdded;
-
-    /* Adds a Name, Timezone, and Tweet to neo4j */
-    private void addToDB(String msg) {
-
-        try {
-            Object obj = parser.parse(msg);
-
-            JSONObject jsonObject = (JSONObject)obj;
-            JSONObject userObject = (JSONObject) jsonObject.get("user");
-
-            String tweet = jsonObject.get("text").toString();
-            String userName = userObject.get("name").toString();
-            String timeZone = userObject.get("time_zone").toString();
-
-            final String createQuerry = "CREATE (n:Person {name:'" + userName + "', time_zone:'" + timeZone + "', tweet:'" + tweet + "'}) RETURN n;";
-
-            neoTx.query(createQuerry);
-            amountAdded++;
-
-        } catch(ParseException pe) {
-            pe.printStackTrace();
-        } catch(NullPointerException pe) {
-            // Received something other than a created tweet (i.e. deletion)
-        }
-    }
+    private ArrayList<Location> locationList;
+    private static Location usaLocation;
+    private static Location.Coordinate bottomLeft;
+    private static Location.Coordinate topRight;
 
     public TwitterStream() {
 
@@ -62,7 +45,11 @@ public class TwitterStream {
         auth = new OAuth1(consumerKey, consumerSecret, token, secret);
         parser = new JSONParser();
         neoTx = new TxHandler();
-        amountAdded = 0;
+        locationList = new ArrayList<Location>();
+        bottomLeft = new Location.Coordinate(-124.7,25.3);
+        topRight = new Location.Coordinate(-67.0,49.2);
+        usaLocation = new Location(bottomLeft, topRight);
+        locationList.add(usaLocation);
 
     }
 
@@ -73,54 +60,110 @@ public class TwitterStream {
         /* Create an appropriately sized blocking queue */
         BlockingQueue<String> queue = new LinkedBlockingDeque<String>(count);
 
-        /* Define endpoint. By default, delimited=length is set
-         * (we need this for our processor) and stall warnings are on */
-        StatusesSampleEndpoint endpoint = new StatusesSampleEndpoint();
-        endpoint.stallWarnings(false);
+        /* Create an endpoint that gets tweets within the US (POST) */
+        StatusesFilterEndpoint endpoint = new StatusesFilterEndpoint();
+        endpoint.locations(locationList);
 
-        /* Create a new BasicClient. By default gzip is enabled. */
-        BasicClient client = new ClientBuilder() // THIS LINE CAUSES AN ERROR with SLF4J
-                .name("sampleExampleClient")
+        /* Create a client to connect with Twitter */
+        BasicClient client = new ClientBuilder()
                 .hosts(Constants.STREAM_HOST)
                 .endpoint(endpoint)
                 .authentication(auth)
                 .processor(new StringDelimitedProcessor(queue))
                 .build();
 
-        /* Establish connection */
+        /* Establish Connections*/
+        System.out.print("Connecting to twitter... ");
         client.connect();
+        System.out.println("Done.");
 
-        /* Fetch 'count' tweets and store them in neo4j */
-        for(int msgRead = 0; msgRead < count; msgRead++) {
-            if(client.isDone()) {
-                System.out.println("Client connection closed unexpectedly: " +
-                        client.getExitEvent().getMessage());
-                break;
+        /* Add queued messages to neo4j */
+        System.out.print("Fetching data... ");
+        try {
+            for (int msgRead = 0; msgRead < count; msgRead++) {
+                String msg = queue.take();
+                if(isTweetWithGeo(msg)) {
+                    String query = convertToQuery(msg);
+                    neoTx.query(query);
+                }
             }
-
-            String msg = null;
-
-            try {
-                msg = queue.poll(5, TimeUnit.SECONDS);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
-            if(msg == null) {
-                System.out.println("Did not receive a message in 5 seconds");
-            } else {
-                addToDB(msg);
-            }
+        } catch (InterruptedException ie) {
+            ie.printStackTrace();
         }
 
+        System.out.println("Done.");
+
+        System.out.print("Closing connection...");
         client.stop();
+        System.out.println("Done.");
 
-        /* Print some statistics */
-        System.out.println(amountAdded + " tweets added to neo4j");
-
-        /* Reset the amount added */
-        amountAdded = 0;
 
     }
+
+    private String convertToQuery(String msg) {
+
+        String query = "";
+
+        try {
+            JSONObject jsonObject = (JSONObject) parser.parse(msg);
+
+            JSONObject userObject = (JSONObject) jsonObject.get("user");
+            JSONObject coordObject = (JSONObject) jsonObject.get("coordinates");
+            JSONObject placeObject = (JSONObject) jsonObject.get("place");
+            JSONObject entitiesObject = (JSONObject) jsonObject.get("entities");
+
+            JSONArray coordArray = (JSONArray) coordObject.get("coordinates");
+            JSONArray hashtagArray = (JSONArray) entitiesObject.get("hashtags");
+
+            String userName = userObject.get("name").toString();
+            String tweet = jsonObject.get("text").toString();
+            String place = placeObject.get("full_name").toString();
+            String hashtags = hashtagArray.toString();
+            double longitude = (Double) coordArray.get(0);
+            double latitude = (Double) coordArray.get(1);
+
+            query = "CREATE (n:Tweet {name:'" + userName +
+                    "', place:'" + place +
+                    "', tweet:'" + tweet +
+                    "', tags:'" + hashtags +
+                    "', latitude:" + latitude +
+                    ", longitude:" + longitude +
+                    "}) RETURN n;";
+
+        } catch(ParseException pe) {
+            System.out.println("Parse exception error in convertToQuery.");
+            pe.printStackTrace();
+        } catch (NullPointerException npe) {
+            System.out.println("Null Pointer Exception in convertToQuery.");
+            System.out.println("Message: " + msg);
+            npe.printStackTrace();
+        }
+
+        if(query.equals("")) {
+            System.out.println("Uncaught conversion error. Exiting.");
+            System.exit(-1);
+        }
+        return query;
+    }
+
+    private boolean isTweetWithGeo(String msg) {
+        try {
+            JSONObject jsonObject = (JSONObject) parser.parse(msg);
+            JSONObject coordObject = (JSONObject) jsonObject.get("coordinates");
+            JSONObject placeObject = (JSONObject) jsonObject.get("place");
+            boolean isTweet = jsonObject.containsKey("text");
+            if(isTweet && coordObject != null && placeObject != null) {
+                /* Make sure tweet was created in the US */
+                if(placeObject.get("country_code").toString().equals("US")) {
+                    return true;
+                }
+            }
+        } catch(ParseException pe) {
+            pe.printStackTrace();
+        }
+        return false;
+    }
+
+
 
 }

@@ -27,6 +27,7 @@ public class TxHandler {
 
     }
 
+    // TODO: Parse a response carrying twitter data
     /* Parses neo4j response */
     private void parseResponse(String neoResponse) {
 
@@ -58,8 +59,6 @@ public class TxHandler {
     /* Send a query to cypher */
     private void send(final String query) {
 
-        System.out.println("Sending query...");
-
         /* Set the transaction URI */
         final String txUri = SERVER_ROOT_URI + "transaction/commit/";
 
@@ -84,7 +83,7 @@ public class TxHandler {
             System.out.println("ERROR. Status: " + status);
         } else {
             String neoResponse = response.getEntity(String.class);
-            System.out.println("Response: " + neoResponse);
+            //System.out.println("Response: " + neoResponse);
             //parseResponse(neoResponse);
         }
 
@@ -101,9 +100,15 @@ public class TxHandler {
     }
 
     /* Add a name and an age */
-    public void add(final String name, final String ageStr) {
-        int age = Integer.parseInt(ageStr);
-        final String query = "CREATE (n:Person {name:'" + name + "', age:" + age + "}) RETURN n;";
+    public void add(final String userName, final String tweet, final String place,
+                    final double latitude, final double longitude ) {
+        String query = "CREATE (n:Tweet {name:'" + userName +
+                "', place:'" + place +
+                "', tweet:'" + tweet +
+                "', latitude:" + latitude +
+                ", longitude:" + longitude +
+                "}) RETURN n;";
+
         send(query);
     }
 
