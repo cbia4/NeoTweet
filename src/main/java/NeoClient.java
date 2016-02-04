@@ -21,6 +21,7 @@ public class NeoClient {
         System.out.println("--------------------------------------------");
         System.out.println("Options:");
         System.out.println("FETCH <count>");
+        System.out.println("SEARCH PLACE");
         //System.out.println("ADD <name> <age>");
         //System.out.println("ADDREL <name1> <RELTYPE> <name2>");
         //System.out.println("DELETE <name>");
@@ -49,6 +50,14 @@ public class NeoClient {
             if( inputSplit[0].equals("ADD") ) {
                 //neoTx.add(inputSplit[1],inputSplit[2]);
                 System.out.println("Option disabled.");
+            }
+
+            else if( inputSplit[0].equals("SEARCH")) {
+                if(inputSplit[1].equals("PLACE")) {
+                    System.out.print("--> ");
+                    input = sc.nextLine();
+                    neoTx.query("MATCH (n {place:'" + input + "'}) RETURN n;");
+                }
             }
 
             else if( inputSplit[0].equals("FETCH") ) {

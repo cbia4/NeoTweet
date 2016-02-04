@@ -30,9 +30,7 @@ public class TwitterStream {
     private static JSONParser parser;
     private static TxHandler neoTx;
     private ArrayList<Location> locationList;
-    private static Location usaLocation;
-    private static Location.Coordinate bottomLeft;
-    private static Location.Coordinate topRight;
+
 
     public TwitterStream() {
 
@@ -46,14 +44,18 @@ public class TwitterStream {
         parser = new JSONParser();
         neoTx = new TxHandler();
         locationList = new ArrayList<Location>();
-        bottomLeft = new Location.Coordinate(-124.7,25.3);
-        topRight = new Location.Coordinate(-67.0,49.2);
-        usaLocation = new Location(bottomLeft, topRight);
+
+        /* Limit twitter stream to tweets created in the US */
+        Location.Coordinate bottomLeft = new Location.Coordinate(-124.7,25.3);
+        Location.Coordinate topRight = new Location.Coordinate(-67.0,49.2);
+        Location usaLocation = new Location(bottomLeft, topRight);
         locationList.add(usaLocation);
 
     }
 
+    /* Connects to twitter through a Status Filter Endpoint */
     public void fetch(String countString) {
+
 
         int count = Integer.parseInt(countString);
 
@@ -78,13 +80,17 @@ public class TwitterStream {
         System.out.println("Done.");
 
         /* Add queued messages to neo4j */
-        System.out.print("Fetching data... ");
+        System.out.println("Fetching data... ");
+        int numQueries = 0;
         try {
             for (int msgRead = 0; msgRead < count; msgRead++) {
                 String msg = queue.take();
                 if(isTweetWithGeo(msg)) {
-                    String query = convertToQuery(msg);
-                    neoTx.query(query);
+                    ArrayList<String> queryList = convertToQuery(msg);
+                    for(String query : queryList) {
+                        neoTx.query(query);
+                        numQueries++;
+                    }
                 }
             }
         } catch (InterruptedException ie) {
@@ -96,53 +102,45 @@ public class TwitterStream {
         System.out.print("Closing connection...");
         client.stop();
         System.out.println("Done.");
+        System.out.println("Hashtags Added: " + numQueries);
 
 
     }
 
-    private String getHashtags(JSONArray hashtagArray) {
-        String tagList = "";
+    /* Extracts hashtags from tweets and places them in a queryArray */
+    private ArrayList<String> convertToQuery(String msg) {
 
-        for(int i = 0; i < hashtagArray.size(); i++) {
-            JSONObject hashtag = (JSONObject) hashtagArray.get(i);
-            tagList += hashtag.get("text").toString() + " ";
-        }
-
-        return tagList;
-    }
-
-    private String convertToQuery(String msg) {
-
-        String query = "";
+        ArrayList<String> queryList = new ArrayList<String>();
 
         try {
             JSONObject jsonObject = (JSONObject) parser.parse(msg);
 
-            JSONObject userObject = (JSONObject) jsonObject.get("user");
+            /* latitude and longitude */
             JSONObject coordObject = (JSONObject) jsonObject.get("coordinates");
-            JSONObject placeObject = (JSONObject) jsonObject.get("place");
-            JSONObject entitiesObject = (JSONObject) jsonObject.get("entities");
-
             JSONArray coordArray = (JSONArray) coordObject.get("coordinates");
-            JSONArray hashtagArray = (JSONArray) entitiesObject.get("hashtags");
-
-            String userName = userObject.get("name").toString();
-            String tweet = jsonObject.get("text").toString();
-            String place = placeObject.get("name").toString();
-            String fullPlace = placeObject.get("full_name").toString();
             double longitude = (Double) coordArray.get(0);
             double latitude = (Double) coordArray.get(1);
 
-            String hashtags = getHashtags(hashtagArray);
+            /* place = city name, fullPlace = city, state */
+            JSONObject placeObject = (JSONObject) jsonObject.get("place");
+            String place = placeObject.get("name").toString();
+            String fullPlace = placeObject.get("full_name").toString();
 
-            query = "CREATE (n:Tweet {name:'" + userName +
-                    "', place:'" + place +
-                    "', full_place:'" + fullPlace +
-                    "', tweet:'" + tweet +
-                    "', hashtags:'" + hashtags +
-                    "', latitude:" + latitude +
-                    ", longitude:" + longitude +
-                    "}) RETURN n;";
+            /* hashtags */
+            JSONObject entitiesObject = (JSONObject) jsonObject.get("entities");
+            JSONArray hashtagArray = (JSONArray) entitiesObject.get("hashtags");
+
+            for(Object hashObj : hashtagArray) {
+                JSONObject hash = (JSONObject) hashObj;
+                String query = "CREATE (n:Hashtag {hashtag:'" + hash.get("text").toString() +
+                        "', latitude:'" + latitude +
+                        "', longitude:'" + longitude +
+                        "', place:'" + place +
+                        "', full_place:'" + fullPlace + "'}) RETURN n;";
+
+                queryList.add(query);
+
+            }
 
         } catch(ParseException pe) {
             System.out.println("Parse exception error in convertToQuery.");
@@ -153,13 +151,14 @@ public class TwitterStream {
             npe.printStackTrace();
         }
 
-        if(query.equals("")) {
-            System.out.println("Uncaught conversion error. Exiting.");
-            System.exit(-1);
-        }
-        return query;
+        return queryList;
+
     }
 
+    /* Filter to make sure geographic data is available
+     * and tweet came from the US
+     *
+     */
     private boolean isTweetWithGeo(String msg) {
         try {
             JSONObject jsonObject = (JSONObject) parser.parse(msg);
@@ -177,7 +176,5 @@ public class TwitterStream {
         }
         return false;
     }
-
-
 
 }
