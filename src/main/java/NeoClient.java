@@ -8,112 +8,61 @@ import java.util.*;
 public class NeoClient {
 
     private TxHandler neoTx;
-    private Scanner sc;
-    private String input;
     private TwitterStream stream;
 
     public NeoClient() {
-
         neoTx = new TxHandler();
-        sc = new Scanner(System.in);
         stream = new TwitterStream();
-        input = "";
+    }
+
+    public void printInstructions() {
         System.out.println("--------------------------------------------");
         System.out.println("Options:");
         System.out.println("FETCH <count>");
-        System.out.println("SEARCH PLACE");
-        //System.out.println("ADD <name> <age>");
-        //System.out.println("ADDREL <name1> <RELTYPE> <name2>");
-        //System.out.println("DELETE <name>");
+        System.out.println("READ");
         System.out.println("DELALL (delete all nodes and rels)");
-        //System.out.println("UPDATE <oldname> <newname> <newage>");
-        //System.out.println("READ <name>");
-        //System.out.println("READALL (read all nodes)");
         System.out.println("QUERY (cypher query)");
         System.out.println("EXIT (quit client)");
         System.out.println("--------------------------------------------");
         System.out.println();
-
     }
 
     // TODO: Update client input options
     public void getInput() {
 
-        String[] inputSplit;
+        Scanner sc = new Scanner(System.in);
+        String input;
+        String[] inputString;
+        String option;
+        boolean inSession = true;
 
-
-        while(!input.equals("EXIT")) {
+        while(inSession) {
             System.out.print("-> ");
             input = sc.nextLine();
-            inputSplit = input.split(" ");
+            inputString = input.split(" ");
+            option = inputString[0];
 
-            if( inputSplit[0].equals("ADD") ) {
-                //neoTx.add(inputSplit[1],inputSplit[2]);
-                System.out.println("Option disabled.");
-            }
-
-            else if( inputSplit[0].equals("SEARCH")) {
-                if(inputSplit[1].equals("PLACE")) {
-                    System.out.print("--> ");
-                    input = sc.nextLine();
-                    neoTx.query("MATCH (n {place:'" + input + "'}) RETURN n;");
-                }
-            }
-
-            else if( inputSplit[0].equals("FETCH") ) {
-                stream.fetch(inputSplit[1]);
-            }
-
-            else if( inputSplit[0].equals("ADDREL") ) {
-                //neoTx.addRel(inputSplit[1], inputSplit[2], inputSplit[3]);
-                System.out.println("Option disabled.");
-            }
-
-            else if( inputSplit[0].equals("DELETE") ) {
-                //neoTx.delete(inputSplit[1]);
-                System.out.println("Option disabled.");
-            }
-
-            else if( inputSplit[0].equals("DELALL") ) {
-                neoTx.query("MATCH (n) DETACH DELETE n;");
-            }
-
-            else if( inputSplit[0].equals("UPDATE") ) {
-                //neoTx.update(inputSplit[1], inputSplit[2], inputSplit[3]);
-                System.out.println("Option disabled.");
-            }
-
-            else if( inputSplit[0].equals("READ") ) {
-
-                //neoTx.read(inputSplit[1]);
-                System.out.println("Option disabled.");
-            }
-
-            else if( inputSplit[0].equals("READALL") ) {
-
-                /*
-                System.out.println("NODES:");
-                neoTx.query("MATCH (n) RETURN n;");
-                System.out.println("RELATIONSHIPS:");
-                neoTx.query("MATCH (n)-[r]->() RETURN r;");
-
-                */
-
-                System.out.println("Option disabled.");
-            }
-
-            else if ( inputSplit[0].equals("QUERY") ) {
-                System.out.print("--> ");
+            if (option.equals("QUERY")) {
+                System.out.print("-->");
                 input = sc.nextLine();
-                neoTx.query(input);
-            }
-
-            else {
-                if(!inputSplit[0].equals("EXIT")) {
-                    System.out.println("Error: Invalid input!");
-                }
+                neoTx.query(input,true);
+            } else if (option.equals("FETCH")) {
+                stream.fetch(inputString[1]);
+            } else if (option.equals("EXIT")) {
+                inSession = false;
+            } else if (option.equals("DELALL")) {
+                neoTx.query("MATCH (n) DETACH DELETE n;", true);
+            } else if (option.equals("READ")) {
+                neoTx.query("MATCH (n) RETURN n;", true);
+            } else if (option.equals("PLACES")) {
+                neoTx.query("MATCH(n:Location) RETURN n;",true);
+            } else if (option.equals("TAGS")) {
+                neoTx.query("MATCH(n:Hashtag) RETURN n;",true);
+            } else {
+                System.out.println("Error: Invalid option.");
             }
         }
+
     }
 
 }

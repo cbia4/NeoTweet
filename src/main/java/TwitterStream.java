@@ -12,6 +12,9 @@ import org.json.simple.JSONArray;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.json.simple.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.impl.SimpleLogger;
 
 
 import java.util.ArrayList;
@@ -30,6 +33,7 @@ public class TwitterStream {
     private static JSONParser parser;
     private static TxHandler neoTx;
     private ArrayList<Location> locationList;
+    private static Logger logger;
 
 
     public TwitterStream() {
@@ -44,6 +48,10 @@ public class TwitterStream {
         parser = new JSONParser();
         neoTx = new TxHandler();
         locationList = new ArrayList<Location>();
+
+        /* logger will catch warnings and errors from twitter stream and print them */
+        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY,"WARNING");
+        logger = LoggerFactory.getLogger(com.twitter.hbc.httpclient.BasicClient.class);
 
         /* Limit twitter stream to tweets created in the US */
         Location.Coordinate bottomLeft = new Location.Coordinate(-124.7,25.3);
@@ -81,36 +89,31 @@ public class TwitterStream {
 
         /* Add queued messages to neo4j */
         System.out.println("Fetching data... ");
-        int numQueries = 0;
         try {
             for (int msgRead = 0; msgRead < count; msgRead++) {
                 String msg = queue.take();
                 if(isTweetWithGeo(msg)) {
-                    ArrayList<String> queryList = convertToQuery(msg);
-                    for(String query : queryList) {
-                        neoTx.query(query);
-                        numQueries++;
-                    }
+                    String query = convertToQuery(msg);
+                    neoTx.query(query,false);
                 }
             }
         } catch (InterruptedException ie) {
             ie.printStackTrace();
         }
 
-        System.out.println("Done.");
 
+        System.out.println("Done.");
         System.out.print("Closing connection...");
         client.stop();
         System.out.println("Done.");
-        System.out.println("Hashtags Added: " + numQueries);
 
 
     }
 
     /* Extracts hashtags from tweets and places them in a queryArray */
-    private ArrayList<String> convertToQuery(String msg) {
+    private String convertToQuery(String msg) {
 
-        ArrayList<String> queryList = new ArrayList<String>();
+        String query = "";
 
         try {
             JSONObject jsonObject = (JSONObject) parser.parse(msg);
@@ -130,16 +133,16 @@ public class TwitterStream {
             JSONObject entitiesObject = (JSONObject) jsonObject.get("entities");
             JSONArray hashtagArray = (JSONArray) entitiesObject.get("hashtags");
 
+            query = "CREATE (n:Location {name:'" + place +
+                    "' , full_name:'" + fullPlace +
+                    "', latitude:" + latitude +
+                    " , longitude:" + longitude + " }) ";
+
             for(Object hashObj : hashtagArray) {
                 JSONObject hash = (JSONObject) hashObj;
-                String query = "CREATE (n:Hashtag {hashtag:'" + hash.get("text").toString() +
-                        "', latitude:'" + latitude +
-                        "', longitude:'" + longitude +
-                        "', place:'" + place +
-                        "', full_place:'" + fullPlace + "'}) RETURN n;";
-
-                queryList.add(query);
-
+                String hashtag = hash.get("text").toString();
+                query += "CREATE (" + hashtag + ":Hashtag {hashtag:'" + hashtag +
+                        "'}) CREATE (" + hashtag + ")-[:AT]->(n) ";
             }
 
         } catch(ParseException pe) {
@@ -151,7 +154,7 @@ public class TwitterStream {
             npe.printStackTrace();
         }
 
-        return queryList;
+        return query;
 
     }
 

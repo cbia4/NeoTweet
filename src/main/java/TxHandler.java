@@ -57,7 +57,7 @@ public class TxHandler {
     }
 
     /* Send a query to cypher */
-    private void send(final String query) {
+    private void send(final String query, boolean shouldRespond) {
 
         /* Set the transaction URI */
         final String txUri = SERVER_ROOT_URI + "transaction/commit/";
@@ -75,19 +75,23 @@ public class TxHandler {
                 .entity( payload )
                 .post( ClientResponse.class );
 
-        /* Capture response status */
-        int status = response.getStatus();
+        /* Capture response status and json*/
+        int statusCode = response.getStatus();
+        String neoResponse = response.getEntity(String.class);
 
         /* Print status or neo4j response */
-        if(status != 200) {
-            System.out.println("ERROR. Status: " + status);
-        } else {
-            String neoResponse = response.getEntity(String.class);
-            //System.out.println("Response: " + neoResponse);
-            //parseResponse(neoResponse);
+
+        if(shouldRespond) {
+            if(statusCode != 200) {
+                System.out.println("Error. Status: " + statusCode);
+            } else {
+                System.out.println("Success.");
+                System.out.println("Response: " + neoResponse);
+            }
+
+            System.out.println();
         }
 
-        //System.out.println();
         response.close();
 
     }
@@ -95,8 +99,8 @@ public class TxHandler {
     // TODO: Update client input options
 
     /* Send a query in cypher syntax to neo4j */
-    public void query(final String query) {
-        send(query);
+    public void query(final String query, boolean shouldRespond) {
+        send(query, shouldRespond);
     }
 
     /* Add a name and an age */
@@ -109,7 +113,7 @@ public class TxHandler {
                 ", longitude:" + longitude +
                 "}) RETURN n;";
 
-        send(query);
+        send(query,true);
     }
 
     /* Connect one node to another by name */
@@ -120,31 +124,31 @@ public class TxHandler {
                 "CREATE (a)-[r:" + relType + " {name: a.name + '-[" + relType + "]->' + b.name}]->(b) " +
                 "RETURN r;";
 
-        send(query);
+        send(query,true);
     }
 
     /* Delete a node matching the specified name */
     public void delete(final String name) {
         final String query = "MATCH (n:Person {name:'" + name + "'}) DETACH DELETE n;";
-        send(query);
+        send(query,true);
     }
 
     /* Update an nodes name and age */
     public void update(final String oldName, final String newName, final String newAge) {
         int age = Integer.parseInt(newAge);
         final String query = "MATCH (n:Person {name:'" + oldName + "'}) SET n.name = '" + newName + "', n.age = " + age + " RETURN n;";
-        send(query);
+        send(query,true);
     }
 
     /* Get all nodes with the specified name */
     public void read(final String name) {
         System.out.println("NODES:");
         final String query1 = "MATCH (n:Person {name:'" + name + "'}) RETURN n;";
-        send(query1);
+        send(query1,true);
 
         System.out.println("RELATIONSHIPS:");
         final String query2 = "MATCH (n:Person {name:'" + name + "'})-[r]->() RETURN r;";
-        send(query2);
+        send(query2,true);
     }
 
 }
