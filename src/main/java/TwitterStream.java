@@ -12,8 +12,6 @@ import org.json.simple.JSONArray;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 import org.json.simple.JSONObject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.slf4j.impl.SimpleLogger;
 
 
@@ -33,7 +31,7 @@ public class TwitterStream {
     private static JSONParser parser;
     private static TxHandler neoTx;
     private ArrayList<Location> locationList;
-    private static Logger logger;
+    //private static Logger logger;
 
 
     public TwitterStream() {
@@ -50,8 +48,8 @@ public class TwitterStream {
         locationList = new ArrayList<Location>();
 
         /* logger will catch warnings and errors from twitter stream and print them */
-        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY,"WARNING");
-        logger = LoggerFactory.getLogger(com.twitter.hbc.httpclient.BasicClient.class);
+        System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY,"ERROR");
+        //logger = LoggerFactory.getLogger(com.twitter.hbc.httpclient.BasicClient.class);
 
         /* Limit twitter stream to tweets created in the US */
         Location.Coordinate bottomLeft = new Location.Coordinate(-124.7,25.3);
@@ -93,8 +91,9 @@ public class TwitterStream {
             for (int msgRead = 0; msgRead < count; msgRead++) {
                 String msg = queue.take();
                 if(isTweetWithGeo(msg)) {
-                    String query = convertToQuery(msg);
-                    neoTx.query(query,false);
+                    //System.out.println(msg);
+                    addToNeo4j(msg);
+                    //neoTx.query(query,true);
                 }
             }
         } catch (InterruptedException ie) {
@@ -111,9 +110,10 @@ public class TwitterStream {
     }
 
     /* Extracts hashtags from tweets and places them in a queryArray */
-    private String convertToQuery(String msg) {
+    private void addToNeo4j(String msg) {
 
-        String query = "";
+        String locationQuery = "";
+        String wordsQuery = "";
 
         try {
             JSONObject jsonObject = (JSONObject) parser.parse(msg);
@@ -121,6 +121,15 @@ public class TwitterStream {
             /* latitude and longitude */
             JSONObject coordObject = (JSONObject) jsonObject.get("coordinates");
             JSONArray coordArray = (JSONArray) coordObject.get("coordinates");
+
+            /* Remove apostraphe, backslash, and newline from tweets for now */
+            String tweet = jsonObject.get("text").toString()
+                    .replaceAll("'","")
+                    .replaceAll("\"","")
+                    .replaceAll("\n"," ");
+
+            String[] tweetWordArray = tweet.split(" ");
+
             double longitude = (Double) coordArray.get(0);
             double latitude = (Double) coordArray.get(1);
 
@@ -129,21 +138,72 @@ public class TwitterStream {
             String place = placeObject.get("name").toString();
             String fullPlace = placeObject.get("full_name").toString();
 
+
             /* hashtags */
             JSONObject entitiesObject = (JSONObject) jsonObject.get("entities");
             JSONArray hashtagArray = (JSONArray) entitiesObject.get("hashtags");
 
-            query = "CREATE (n:Location {name:'" + place +
-                    "' , full_name:'" + fullPlace +
+            locationQuery = "CREATE (new:Location {title:'" + place +
+                    "', text:'" + tweet +
+                    "', full_name:'" + fullPlace +
                     "', latitude:" + latitude +
-                    " , longitude:" + longitude + " }) ";
+                    " , longitude:" + longitude + " }) " +
+                    "WITH new " +
+                    "MATCH (n:Location) " +
+                    "WHERE n.latitude < new.latitude + 0.5 " +
+                    "AND n.latitude > new.latitude - 0.5 " +
+                    "AND n.longitude > new.longitude - 0.5 " +
+                    "AND n.longitude < new.longitude + 0.5 " +
+                    "AND n <> new " +
+                    "WITH abs(n.latitude - new.latitude) AS x, abs(n.longitude - new.longitude) AS y, n, new " +
+                    "CREATE (new)-[r1:CLOSE_TO {distance: sqrt((x*x) + (y*y))}]->(n)";
 
-            for(Object hashObj : hashtagArray) {
-                JSONObject hash = (JSONObject) hashObj;
-                String hashtag = hash.get("text").toString();
-                query += "CREATE (" + hashtag + ":Hashtag {hashtag:'" + hashtag +
-                        "'}) CREATE (" + hashtag + ")-[:AT]->(n) ";
-            }
+            /*
+
+            CREATE (new:Location {title:"myPlace2", latitude: 40.9233, longitude: -73.155})
+            WITH new
+            MATCH (n:Location)
+            WHERE n.latitude < new.latitude + 0.5
+            AND n.latitude > new.latitude - 0.5
+            AND n.longitude > new.longitude - 0.5
+            AND n.longitude < new.longitude + 0.5
+            AND n <> new
+            WITH abs(n.latitude - new.latitude) AS x, abs(n.longitude - new.longitude) AS y, n, new
+            CREATE (new)-[r1:CLOSE_TO {distance: sqrt((x*x) + (y*y))}]->(n)
+
+
+             */
+
+
+
+            /* MENTIONED_AT Relationship */
+//            for(Object hashObj : hashtagArray) {
+//                JSONObject hash = (JSONObject) hashObj;
+//                String hashtag = hash.get("text").toString();
+//                query += "CREATE (" + hashtag + ":Hashtag {hashtag:'" + hashtag +
+//                        "'}) CREATE (" + hashtag + ")-[:MENTIONED_AT]->(new) ";
+//
+//                System.out.println(hashtag);
+//
+//            }
+
+
+            /* Adding words to the database */
+//            int wordNum = 0;
+//            for(String word : tweetWordArray) {
+//                wordsQuery += "CREATE (word" + wordNum + ":Word {word:'" + word +
+//                        "', plcae:'" + place +
+//                        "', full_name:'" + fullPlace +
+//                        "', latitude:" + latitude +
+//                        " , longitude:" + longitude + " }) ";
+//
+//                wordNum++;
+//
+//            }
+
+            neoTx.query(locationQuery,false);
+            //neoTx.query(wordsQuery,false);
+
 
         } catch(ParseException pe) {
             System.out.println("Parse exception error in convertToQuery.");
@@ -154,7 +214,6 @@ public class TwitterStream {
             npe.printStackTrace();
         }
 
-        return query;
 
     }
 
