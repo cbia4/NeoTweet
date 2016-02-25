@@ -201,6 +201,7 @@ public class TwitterStream {
 //
 //            }
 
+
             neoTx.query(locationQuery,false);
             //neoTx.query(wordsQuery,false);
 
