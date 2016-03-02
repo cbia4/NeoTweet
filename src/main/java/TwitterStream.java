@@ -91,16 +91,17 @@ public class TwitterStream {
             for (int msgRead = 0; msgRead < count; msgRead++) {
                 String msg = queue.take();
                 if(isTweetWithGeo(msg)) {
-                    //System.out.println(msg);
-                    addToNeo4j(msg);
-                    //neoTx.query(query,true);
+
+                    /* Parse for relevant information and add to neo4j */
+                    updateNeo4j(msg);
+
                 }
             }
         } catch (InterruptedException ie) {
             ie.printStackTrace();
         }
 
-
+        /* Close connection to twitter */
         System.out.println("Done.");
         System.out.print("Closing connection...");
         client.stop();
@@ -109,118 +110,50 @@ public class TwitterStream {
 
     }
 
-    /* Extracts hashtags from tweets and places them in a queryArray */
-    private void addToNeo4j(String msg) {
-
-        String locationQuery = "";
-        String wordsQuery = "";
+    /* Extracts location and words from a tweet and update neo4j accordingly */
+    private void updateNeo4j(String msg) {
 
         try {
             JSONObject jsonObject = (JSONObject) parser.parse(msg);
 
-            /* latitude and longitude */
+            /* Parse JSON for the fields we are interested in */
             JSONObject coordObject = (JSONObject) jsonObject.get("coordinates");
             JSONArray coordArray = (JSONArray) coordObject.get("coordinates");
+            JSONObject placeObject = (JSONObject) jsonObject.get("place");
 
-            /* Remove apostraphe, backslash, and newline from tweets for now */
+            /* Parse JSON for tweet */
+            /*Remove apostraphe, backslash, newline, comma, and colon from tweets for now */
             String tweet = jsonObject.get("text").toString()
                     .replaceAll("'","")
                     .replaceAll("\"","")
-                    .replaceAll("\n"," ");
+                    .replaceAll("\n"," ")
+                    .replaceAll(",","")
+                    .replaceAll(":","");
 
+            /* Put all words of tweet in an array */
             String[] tweetWordArray = tweet.split(" ");
 
+            /* Parse JSON for Location attributes */
+            String location = placeObject.get("name").toString();
+            String fullLocation = placeObject.get("full_name").toString();
             double longitude = (Double) coordArray.get(0);
             double latitude = (Double) coordArray.get(1);
 
-            /* place = city name, fullPlace = city, state */
-            JSONObject placeObject = (JSONObject) jsonObject.get("place");
-            String place = placeObject.get("name").toString();
-            String fullPlace = placeObject.get("full_name").toString();
-
-
-            /* hashtags */
-            JSONObject entitiesObject = (JSONObject) jsonObject.get("entities");
-            JSONArray hashtagArray = (JSONArray) entitiesObject.get("hashtags");
-
-            locationQuery = "CREATE (new:Location {title:'" + place +
-                    "', text:'" + tweet +
-                    "', full_name:'" + fullPlace +
-                    "', latitude:" + latitude +
-                    " , longitude:" + longitude + " }) " +
-                    "WITH new " +
-                    "MATCH (n:Location) " +
-                    "WHERE n.latitude < new.latitude + 0.5 " +
-                    "AND n.latitude > new.latitude - 0.5 " +
-                    "AND n.longitude > new.longitude - 0.5 " +
-                    "AND n.longitude < new.longitude + 0.5 " +
-                    "AND n <> new " +
-                    "WITH abs(n.latitude - new.latitude) AS x, abs(n.longitude - new.longitude) AS y, n, new " +
-                    "CREATE (new)-[r1:CLOSE_TO {distance: sqrt((x*x) + (y*y))}]->(n)";
-
-            /*
-
-            CREATE (new:Location {title:"myPlace2", latitude: 40.9233, longitude: -73.155})
-            WITH new
-            MATCH (n:Location)
-            WHERE n.latitude < new.latitude + 0.5
-            AND n.latitude > new.latitude - 0.5
-            AND n.longitude > new.longitude - 0.5
-            AND n.longitude < new.longitude + 0.5
-            AND n <> new
-            WITH abs(n.latitude - new.latitude) AS x, abs(n.longitude - new.longitude) AS y, n, new
-            CREATE (new)-[r1:CLOSE_TO {distance: sqrt((x*x) + (y*y))}]->(n)
-
-
-             */
-
-
-
-            /* MENTIONED_AT Relationship */
-//            for(Object hashObj : hashtagArray) {
-//                JSONObject hash = (JSONObject) hashObj;
-//                String hashtag = hash.get("text").toString();
-//                query += "CREATE (" + hashtag + ":Hashtag {hashtag:'" + hashtag +
-//                        "'}) CREATE (" + hashtag + ")-[:MENTIONED_AT]->(new) ";
-//
-//                System.out.println(hashtag);
-//
-//            }
-
-
-            /* Adding words to the database */
-//            int wordNum = 0;
-//            for(String word : tweetWordArray) {
-//                wordsQuery += "CREATE (word" + wordNum + ":Word {word:'" + word +
-//                        "', plcae:'" + place +
-//                        "', full_name:'" + fullPlace +
-//                        "', latitude:" + latitude +
-//                        " , longitude:" + longitude + " }) ";
-//
-//                wordNum++;
-//
-//            }
-
-
-            neoTx.query(locationQuery,false);
-            //neoTx.query(wordsQuery,false);
-
+            neoTx.createTweetAtLocation(location, fullLocation, tweet, latitude, longitude);
+            neoTx.updateWordFrequencyAtLocation(tweetWordArray, location, fullLocation, latitude, longitude);
 
         } catch(ParseException pe) {
-            System.out.println("Parse exception error in convertToQuery.");
+            System.out.println("Parse exception error in updateNeo4j.");
             pe.printStackTrace();
         } catch (NullPointerException npe) {
-            System.out.println("Null Pointer Exception in convertToQuery.");
+            System.out.println("Null Pointer Exception in updateNeo4j.");
             System.out.println("Message: " + msg);
             npe.printStackTrace();
         }
-
-
     }
 
     /* Filter to make sure geographic data is available
      * and tweet came from the US
-     *
      */
     private boolean isTweetWithGeo(String msg) {
         try {

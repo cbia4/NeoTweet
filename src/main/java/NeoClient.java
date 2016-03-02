@@ -27,7 +27,6 @@ public class NeoClient {
         System.out.println();
     }
 
-    // TODO: Update client input options
     public void getInput() {
 
         Scanner sc = new Scanner(System.in);
@@ -45,20 +44,26 @@ public class NeoClient {
             if (option.equals("QUERY")) {
                 System.out.print("-->");
                 input = sc.nextLine();
-                neoTx.query(input,true);
-            } else if (option.equals("FETCH")) {
+                neoTx.query(input);
+            }
+
+            else if (option.equals("FETCH")) {
                 stream.fetch(inputString[1]);
-            } else if (option.equals("EXIT")) {
+            }
+
+            else if (option.equals("EXIT")) {
                 inSession = false;
-            } else if (option.equals("DELALL")) {
-                neoTx.query("MATCH (n) DETACH DELETE n;", true);
-            } else if (option.equals("READ")) {
-                neoTx.query("MATCH (n) RETURN n;", true);
-            } else if (option.equals("PLACES")) {
-                neoTx.query("MATCH(n:Location) RETURN n;",true);
-            } else if (option.equals("TAGS")) {
-                neoTx.query("MATCH(n:Hashtag) RETURN n;",true);
-            } else {
+            }
+
+            else if (option.equals("DELALL")) {
+                neoTx.query("MATCH (n) DETACH DELETE n;");
+            }
+
+            else if (option.equals("READ")) {
+                neoTx.query("MATCH (n) RETURN n;");
+            }
+
+            else {
                 System.out.println("Error: Invalid option.");
             }
         }

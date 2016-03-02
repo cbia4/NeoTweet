@@ -18,46 +18,22 @@ public class TxHandler {
 
     final private String SERVER_ROOT_URI;
     private static JSONParser parser;
+    private String lastResponseMessage;
+    private int lastResponseStatus;
+    private Neo4jResponse lastResponse;
 
     /* TxHandler Constructor */
     public TxHandler() {
 
         this.SERVER_ROOT_URI = "http://localhost:7474/db/data/";
         parser = new JSONParser();
-
-    }
-
-    // TODO: Parse a response carrying twitter data
-    /* Parses neo4j response */
-    private void parseResponse(String neoResponse) {
-
-        try {
-
-            Object obj = parser.parse(neoResponse);
-            JSONObject jsonObject = (JSONObject)obj;
-
-            JSONArray results = (JSONArray)jsonObject.get("results");
-            JSONObject data = (JSONObject)results.get(0);
-            JSONArray dataArray = (JSONArray)data.get("data");
-
-            for(int i = 0; i < dataArray.size(); i++) {
-                JSONObject row = (JSONObject)dataArray.get(i);
-                JSONArray dataInRow = (JSONArray)row.get("row");
-                JSONObject info = (JSONObject)dataInRow.get(0);
-                String tweet = info.get("tweet").toString();
-                //String userAge = info.get("age").toString();
-                //int age = Integer.parseInt(userAge);
-                System.out.println("Tweet: " + tweet);
-                //System.out.println(" Age: " + age);
-                System.out.println("------------------------");
-            }
-        } catch(ParseException pe) {
-            pe.printStackTrace();
-        }
+        lastResponseMessage = "";
+        lastResponseStatus = 0;
+        lastResponse = null;
     }
 
     /* Send a query to cypher */
-    private void send(final String query, boolean shouldRespond) {
+    private void send(final String query) {
 
         /* Set the transaction URI */
         final String txUri = SERVER_ROOT_URI + "transaction/commit/";
@@ -76,79 +52,150 @@ public class TxHandler {
                 .post( ClientResponse.class );
 
         /* Capture response status and json*/
-        int statusCode = response.getStatus();
-        String neoResponse = response.getEntity(String.class);
+        lastResponseStatus = response.getStatus();
+        lastResponseMessage = response.getEntity(String.class);
 
         /* Print status or neo4j response */
-
-        if(shouldRespond) {
-            if(statusCode != 200) {
-                System.out.println("Error. Status: " + statusCode);
-            } else {
-                System.out.println("Success.");
-                System.out.println("Response: " + neoResponse);
-            }
-
-            System.out.println();
+        if(lastResponseStatus != 200) {
+            System.out.println("Error. Status Code: " + lastResponseStatus);
+            System.out.println("Response: " + lastResponseMessage);
+        } else {
+            lastResponse = parseResponse(lastResponseMessage);
         }
 
         response.close();
 
     }
 
-    // TODO: Update client input options
+    /* Public method to send a query to neo4j */
+    public void query(final String query) {
+        send(query);
 
-    /* Send a query in cypher syntax to neo4j */
-    public void query(final String query, boolean shouldRespond) {
-        send(query, shouldRespond);
     }
 
-    /* Add a name and an age */
-    public void add(final String userName, final String tweet, final String place,
-                    final double latitude, final double longitude ) {
-        String query = "CREATE (n:Tweet {name:'" + userName +
-                "', place:'" + place +
-                "', tweet:'" + tweet +
+    /* Sends a query that creates a new tweet@Location and relates it to other tweets around it */
+    public void createTweetAtLocation(String location, String fullLocation, String tweet, double latitude, double longitude) {
+        String locationQuery = "CREATE (new:Location {title:'" + location +
+                "', text:'" + tweet +
+                "', full_name:'" + fullLocation +
                 "', latitude:" + latitude +
-                ", longitude:" + longitude +
-                "}) RETURN n;";
+                " , longitude:" + longitude + " }) " +
+                "WITH new " +
+                "MATCH (n:Location) " +
+                "WHERE n.latitude < new.latitude + 0.5 " +
+                "AND n.latitude > new.latitude - 0.5 " +
+                "AND n.longitude > new.longitude - 0.5 " +
+                "AND n.longitude < new.longitude + 0.5 " +
+                "AND n <> new " +
+                "WITH abs(n.latitude - new.latitude) AS x, abs(n.longitude - new.longitude) AS y, n, new " +
+                "CREATE (new)-[r1:CLOSE_TO {distance: sqrt((x*x) + (y*y))}]->(n)";
 
-        send(query,true);
+        send(locationQuery);
     }
 
-    /* Connect one node to another by name */
-    public void addRel(final String name1, final String relType, final String name2) {
+    /* Checks if a word is present near a location and either updates its frequency or creates a new node if the word is not present */
+    public void updateWordFrequencyAtLocation(String[] wordArray, String location, String fullLocation, double latitude, double longitude) {
+        double bound = 0.5;
+        double latLowerBound = latitude - bound;
+        double latUpperBound = latitude + bound;
+        double longLowerBound = longitude - bound;
+        double longUpperBound = longitude + bound;
 
-        final String query = "MATCH (a:Person),(b:Person) " +
-                "WHERE a.name = '" + name1 + "' AND b.name = '" + name2 + "' " +
-                "CREATE (a)-[r:" + relType + " {name: a.name + '-[" + relType + "]->' + b.name}]->(b) " +
-                "RETURN r;";
+        String baseQuery;
+        String matchQuery;
+        String updateQuery;
 
-        send(query,true);
+        for(String word : wordArray) {
+            word = word.toLowerCase();
+
+            baseQuery = "MATCH (n:Word) WHERE n.word = '" + word +
+                    "' AND n.latitude < " + latUpperBound +
+                    " AND n.latitude > " + latLowerBound +
+                    " AND n.longitude < " + longUpperBound +
+                    " AND n.longitude > " + longLowerBound;
+
+            matchQuery = baseQuery + " RETURN n;";
+            send(matchQuery);
+            if(lastResponse.didReceiveData) {
+                updateQuery = " SET n.frequency = n.frequency + 1;";
+                send(updateQuery);
+            } else {
+                addWordAtLocation(word, location, fullLocation,latitude,longitude);
+            }
+        }
     }
 
-    /* Delete a node matching the specified name */
-    public void delete(final String name) {
-        final String query = "MATCH (n:Person {name:'" + name + "'}) DETACH DELETE n;";
-        send(query,true);
+    /* Called in updateWordFrequencyAtLocation when no word was matched at the location */
+    private void addWordAtLocation(String word, String location, String fullLocation, double latitude, double longitude) {
+        int wordLength = word.length();
+        String query = "Create (new:Word {word:'" + word +
+                "', latitude: " + latitude +
+                ", longitude: " + longitude +
+                ", location: '" + location +
+                "', full_location: '" + fullLocation +
+                "', word_length: " + wordLength +
+                ", frequency: 1 } ) " +
+                "WITH new " +
+                "MATCH (n:Word) " +
+                "WHERE n.latitude < new.latitude + 0.5 " +
+                "AND n.latitude > new.latitude - 0.5 " +
+                "AND n.longitude > new.longitude - 0.5 " +
+                "AND n.longitude < new.longitude + 0.5 " +
+                "AND n <> new " +
+                "WITH abs(n.latitude - new.latitude) AS x, abs(n.longitude - new.longitude) AS y, n, new " +
+                "CREATE (new)-[r1:CLOSE_TO {distance: sqrt((x*x) + (y*y))}]->(n)";
+
+        send(query);
+
     }
 
-    /* Update an nodes name and age */
-    public void update(final String oldName, final String newName, final String newAge) {
-        int age = Integer.parseInt(newAge);
-        final String query = "MATCH (n:Person {name:'" + oldName + "'}) SET n.name = '" + newName + "', n.age = " + age + " RETURN n;";
-        send(query,true);
+    /* Parses neo4j response
+     * Returns response object if successful
+     * null if unsuccessful
+     */
+    private Neo4jResponse parseResponse(String responseMessage) {
+
+        Neo4jResponse response = null;
+
+        try {
+            JSONObject jsonObject = (JSONObject) parser.parse(responseMessage);
+            JSONArray errors = (JSONArray) jsonObject.get("errors");
+            JSONArray results = (JSONArray) jsonObject.get("results");
+            response = new Neo4jResponse(results,errors);
+        } catch(ParseException pe) {
+            pe.printStackTrace();
+        }
+
+        return response;
     }
 
-    /* Get all nodes with the specified name */
-    public void read(final String name) {
-        System.out.println("NODES:");
-        final String query1 = "MATCH (n:Person {name:'" + name + "'}) RETURN n;";
-        send(query1,true);
+    /* Class to hold JSON response data from neo4j */
+    private class Neo4jResponse {
 
-        System.out.println("RELATIONSHIPS:");
-        final String query2 = "MATCH (n:Person {name:'" + name + "'})-[r]->() RETURN r;";
-        send(query2,true);
+        private JSONArray data;
+
+        public boolean didReceiveError;
+        public boolean didReceiveData;
+
+        public String errorMessage;
+
+        public Neo4jResponse(JSONArray results, JSONArray errors) {
+            if(!errors.isEmpty()) {
+                JSONObject messageObject = (JSONObject) errors.get(0);
+                errorMessage = messageObject.get("message").toString();
+                didReceiveError = true;
+                didReceiveData = false;
+                data = null;
+            } else {
+                errorMessage = "No error in response";
+                didReceiveError = false;
+                JSONObject resultsObject = (JSONObject) results.get(0);
+                data = (JSONArray) resultsObject.get("data");
+                didReceiveData = !data.isEmpty();
+            }
+        }
+
     }
+
 
 }
