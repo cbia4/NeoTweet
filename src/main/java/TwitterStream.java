@@ -131,7 +131,7 @@ public class TwitterStream {
                     .replaceAll(":","");
 
             /* Put all words of tweet in an array */
-            String[] tweetWordArray = tweet.split(" ");
+            String[] topicArray = tweet.split(" ");
 
             /* Parse JSON for Location attributes */
             String location = placeObject.get("name").toString();
@@ -139,8 +139,10 @@ public class TwitterStream {
             double longitude = (Double) coordArray.get(0);
             double latitude = (Double) coordArray.get(1);
 
-            neoTx.createTweetAtLocation(location, fullLocation, tweet, latitude, longitude);
-            neoTx.updateWordFrequencyAtLocation(tweetWordArray, location, fullLocation, latitude, longitude);
+            //neoTx.createTweetAtLocation(location, fullLocation, tweet, latitude, longitude);
+            //neoTx.updateWordFrequencyAtLocation(topicArray, location, fullLocation, latitude, longitude);
+
+            neoTx.addTweet(location, fullLocation, latitude, longitude, tweet, topicArray);
 
         } catch(ParseException pe) {
             System.out.println("Parse exception error in updateNeo4j.");
