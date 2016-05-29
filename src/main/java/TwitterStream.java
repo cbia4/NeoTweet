@@ -15,6 +15,7 @@ import org.json.simple.JSONObject;
 import org.slf4j.impl.SimpleLogger;
 
 
+import java.io.*;
 import java.util.ArrayList;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingDeque;
@@ -36,20 +37,37 @@ public class TwitterStream {
 
     public TwitterStream() {
 
-        /* OAuth information */
-        String consumerKey = "jcaddGySJUnTzFeK0al8ha4Yl";
-        String consumerSecret = "tYvNQxwHeLCotowIDs44O5bw4ODYVsm9sra8e8AsUz2seFLcrm";
-        String token = "4615942873-hYv16zGpuOmSv0Rezk0eywtsDX6YjR4yr1TY7qA";
-        String secret = "7L9lIgdEmd8bSK6Eh29oend1vMglGc75J9DcXEvpTvR1t";
+        String[] oauth = new String[4];
+        File configFile = new File("/Users/colinbiafore/Desktop/research/db_resources/oauth.txt");
+        if(!configFile.exists()) {
+            System.err.println("Error: Oauth file not found. Exiting");
+            System.exit(1);
+        }
 
-        auth = new OAuth1(consumerKey, consumerSecret, token, secret);
+        try {
+            String line;
+            int i = 0;
+            FileInputStream fis = new FileInputStream(configFile);
+            BufferedReader br = new BufferedReader(new InputStreamReader(fis));
+            while((line = br.readLine()) != null) {
+                oauth[i] = line;
+                i++;
+            }
+            br.close();
+            fis.close();
+        } catch(IOException e) {
+            System.err.println("Error: Failed to read oauth file. Exiting");
+            e.printStackTrace();
+            System.exit(1);
+        }
+
+        auth = new OAuth1(oauth[0], oauth[1], oauth[2], oauth[3]);
         parser = new JSONParser();
         neoTx = new TxHandler();
         locationList = new ArrayList<Location>();
 
         /* logger will catch warnings and errors from twitter stream and print them */
         System.setProperty(SimpleLogger.DEFAULT_LOG_LEVEL_KEY,"ERROR");
-        //logger = LoggerFactory.getLogger(com.twitter.hbc.httpclient.BasicClient.class);
 
         /* Limit twitter stream to tweets created in the US */
         Location.Coordinate bottomLeft = new Location.Coordinate(-124.7,25.3);
@@ -110,7 +128,7 @@ public class TwitterStream {
 
     }
 
-    /* Extracts location and words from a tweet and update neo4j accordingly */
+    /* Extracts location and words from a tweet (JSON) and update neo4j accordingly */
     private void updateNeo4j(String msg) {
 
         try {
@@ -141,7 +159,7 @@ public class TwitterStream {
 
             //neoTx.createTweetAtLocation(location, fullLocation, tweet, latitude, longitude);
             //neoTx.updateWordFrequencyAtLocation(topicArray, location, fullLocation, latitude, longitude);
-
+            System.out.println("Adding tweet: " + tweet);
             neoTx.addTweet(location, fullLocation, latitude, longitude, tweet, topicArray);
 
         } catch(ParseException pe) {

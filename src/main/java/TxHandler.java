@@ -8,6 +8,7 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 import javax.ws.rs.core.MediaType;
+import java.util.ArrayList;
 
 
 /**
@@ -16,7 +17,7 @@ import javax.ws.rs.core.MediaType;
 
 public class TxHandler {
 
-    final private String SERVER_ROOT_URI;
+    private static final String SERVER_ROOT_URI = "http://localhost:7474/db/data/";
     private static JSONParser parser;
     private String lastResponseMessage;
     private int lastResponseStatus;
@@ -26,8 +27,6 @@ public class TxHandler {
 
     /* TxHandler Constructor */
     public TxHandler() {
-
-        this.SERVER_ROOT_URI = "http://localhost:7474/db/data/";
         parser = new JSONParser();
         lastResponseMessage = "";
         lastResponseStatus = 0;
@@ -96,11 +95,23 @@ public class TxHandler {
         send(query);
         if(lastResponse.didReceiveData) {
             System.out.println("neo4j response: " + lastResponse.data);
-        } else {
-            System.out.println("No data returned.");
         }
     }
 
+    // TODO: Organize data into neo4j
+    public void addTweet(Tweet t) {
+
+        // unmarshal arguments
+        double tweetID = t.getTweetID();
+        String username = t.getUsername();
+        int userID = t.getUserID();
+        String text = t.getText();
+        double latitude = t.getLatitude();
+        double longitude = t.getLongitude();
+        ArrayList<String> topics = t.getTopics();
+
+        t.printData();
+    }
 
     /*
      * Our graph has Places, Locations, and Topics
@@ -196,7 +207,6 @@ public class TxHandler {
 
             // if a word was found within .25 of the newly created location
             if(lastResponse.didReceiveData) {
-                System.out.println("Topic Match: " + lastResponse.data);
                 updateQuery = baseQuery + " SET n.frequency = " + updateFrequency() + " WITH n MATCH (l2:Location {location_id: " + currentID + "}) CREATE UNIQUE (n)-[:MENTIONED_AT]->(l2);";
                 send(updateQuery);
             } else {
@@ -214,8 +224,7 @@ public class TxHandler {
         JSONObject rowObject = (JSONObject) lastResponse.data.get(0);
         JSONArray rowArray = (JSONArray) rowObject.get("row");
         JSONObject nodeDataObject = (JSONObject) rowArray.get(0);
-        long frequency = (Long) nodeDataObject.get("frequency") + 1;
-        return frequency;
+        return (Long) nodeDataObject.get("frequency") + 1;
     }
 
     /* Sends a query that creates a new tweet@Location and relates it to other tweets around it */
