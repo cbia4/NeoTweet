@@ -98,6 +98,22 @@ public class TxHandler {
         }
     }
 
+
+    private void addLocation(String text, double tweetID, double latitude, double longitude) {
+        String location = "CREATE (newLocation:Location {text: '" + text + "', tweetID: " + tweetID + ", latitude: " + latitude + ", longitude: " + longitude + "});";
+        send(location);
+    }
+
+    private void addUser(String username, int userID) {
+        String user = "CREATE (newUser:User {username: '" + username + "', userID: " + userID + "});";
+        send(user);
+    }
+
+    private void addTopic(String t, double tweetID) {
+        String topic = "CREATE (newTopic:Topic {topic: '" + t + "', tweetID: " + tweetID + "});";
+        send(topic);
+    }
+
     // TODO: Organize data into neo4j
     public void addTweet(Tweet t) {
 
@@ -110,7 +126,12 @@ public class TxHandler {
         double longitude = t.getLongitude();
         ArrayList<String> topics = t.getTopics();
 
-        t.printData();
+        addLocation(text, tweetID, latitude, longitude);
+        addUser(username,userID);
+        for(String topic : topics) {
+            addTopic(topic, tweetID);
+        }
+
     }
 
     /*

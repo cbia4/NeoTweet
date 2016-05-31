@@ -53,11 +53,16 @@ public class SQLConnect {
     // Transfer tweets from MySQL to neo4j
     public void transferData() {
         getTablesFromFile();
-        for(int i = 0; i < NUM_TABLES; i++) {
-            System.out.println("Loading " + tableNames[i]);
-            extractData(tableNames[i]);
-            System.out.println("Done");
-        }
+        // TODO: Uncomment this section once a smaller dataset has been tested
+//        for(int i = 0; i < NUM_TABLES; i++) {
+//            System.out.println("Loading " + tableNames[i]);
+//            extractData(tableNames[i]);
+//            System.out.println("Done");
+//        }
+
+        extractData("ht_OaklandSolidarity");
+
+
     }
 
     // loads table names from db_file.txt
@@ -97,6 +102,7 @@ public class SQLConnect {
         String sqlQuery;
         Tweet t;
         try {
+
             sqlQuery = "select T.twitter_id, T.text, T.from_user, T.from_user_id, T.geo " +
                     "from " + tableName + " T where T.geo != 'N;' and T.language = 'en'";
             st = conn.createStatement();
