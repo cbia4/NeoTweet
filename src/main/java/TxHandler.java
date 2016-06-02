@@ -100,13 +100,21 @@ public class TxHandler {
 
 
     private void addLocation(String text, double tweetID, double latitude, double longitude) {
-        String location = "CREATE (newLocation:Location {text: '" + text + "', tweetID: " + tweetID + ", latitude: " + latitude + ", longitude: " + longitude + "});";
-        send(location);
+        String checkIfTweetExists = "MATCH (n:Location) WHERE n.tweetID = " + tweetID + " RETURN n;";
+        send(checkIfTweetExists);
+        if(!lastResponse.didReceiveData) {
+            String addNewTweet = "CREATE (n:Location {text: '" + text + "', tweetID: " + tweetID + ", latitude: " + latitude + ", longitude: " + longitude + "});";
+            send(addNewTweet);
+        }
     }
 
     private void addUser(String username, int userID) {
-        String user = "CREATE (newUser:User {username: '" + username + "', userID: " + userID + "});";
-        send(user);
+        String checkIfUserExists = "MATCH (n:User) WHERE n.userID = " + userID + " RETURN n;";
+        send(checkIfUserExists);
+        if(!lastResponse.didReceiveData) {
+            String addNewUser = "CREATE (n:User {username: '" + username + "', userID: " + userID + "});";
+            send(addNewUser);
+        }
     }
 
     private void addTopic(String t, double tweetID) {
@@ -128,9 +136,9 @@ public class TxHandler {
 
         addLocation(text, tweetID, latitude, longitude);
         addUser(username,userID);
-        for(String topic : topics) {
-            addTopic(topic, tweetID);
-        }
+//        for(String topic : topics) {
+//            addTopic(topic, tweetID);
+//        }
 
     }
 

@@ -14,7 +14,8 @@ public class NeoTweet {
         System.out.println("Options:");
         System.out.println("1) Fetch Tweets from Twitter's Public Data Stream");
         System.out.println("2) Transfer tweets from MySQL to neo4j");
-        System.out.println("3) Exit");
+        System.out.println("3) TweetTester");
+        System.out.println("4) Exit");
         System.out.println();
     }
 
@@ -63,7 +64,12 @@ public class NeoTweet {
                 sqlConnect.connect();
                 sqlConnect.transferData();
             } else if(input == 3) {
+                TweetTester tt = new TweetTester();
+                tt.run();
+            } else if(input == 4) {
                 inSession = false;
+            } else {
+                System.out.println("Error: Invalid option.");
             }
         }
 
