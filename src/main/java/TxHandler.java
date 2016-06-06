@@ -98,29 +98,100 @@ public class TxHandler {
         }
     }
 
-
-    private void addLocation(String text, double tweetID, double latitude, double longitude) {
-        String checkIfTweetExists = "MATCH (n:Location) WHERE n.tweetID = " + tweetID + " RETURN n;";
-        send(checkIfTweetExists);
+    // Returns true if new location added and false if location already exists
+    private boolean addLocation(String text, double tweetID, double latitude, double longitude) {
+        send("MATCH (nl:Location) WHERE nl.id = " + tweetID + " RETURN nl;");
         if(!lastResponse.didReceiveData) {
-            String addNewTweet = "CREATE (n:Location {text: '" + text + "', tweetID: " + tweetID + ", latitude: " + latitude + ", longitude: " + longitude + "});";
-            send(addNewTweet);
+            send("CREATE (nl:Location {text: '" + text + "', id: " + tweetID + ", latitude: " + latitude + ", longitude: " + longitude + "});");
+            return true;
+        } else {
+            return false;
         }
     }
 
+    // Creates edges between locations that are close to each other (CLOSE_TO)
+    private void relateLocations( double tweetID, double latitude, double longitude) {
+        double bound = 0.25, latLowerBound = latitude - bound, latUpperBound = latitude + bound, longLowerBound = longitude - bound, longUpperBound = longitude + bound;
+        send("MATCH (l1:Location) WHERE l1.id = " + tweetID +
+                " WITH l1 MATCH (l2:Location) WHERE l2.latitude <= " + latUpperBound + " AND l2.latitude >= " + latLowerBound +
+                " AND l2.longitude <= " + longUpperBound + " AND l2.longitude >= " + longLowerBound +
+                " AND l1 <> l2 WITH l1, l2 CREATE (l1)-[:CLOSE_TO]->(l2);");
+    }
+
+    // Adds new user if not already present in the graph
     private void addUser(String username, int userID) {
-        String checkIfUserExists = "MATCH (n:User) WHERE n.userID = " + userID + " RETURN n;";
-        send(checkIfUserExists);
-        if(!lastResponse.didReceiveData) {
-            String addNewUser = "CREATE (n:User {username: '" + username + "', userID: " + userID + "});";
-            send(addNewUser);
+
+        send("MATCH (newUser:User) WHERE newUser.id = " + userID + " RETURN newUser;");
+        if(!lastResponse.didReceiveData)
+            send("CREATE (newUser:User {username: '" + username + "', id: " + userID + "});");
+
+    }
+
+    // Creates edges between users and the locations they tweet at (TWEETED_AT)
+    private void relateUserToLocation(int userID, double tweetID) {
+        send("MATCH (u:User) WHERE u.id = " + userID + " WITH u MATCH (l:Location) WHERE l.id = " + tweetID +
+                " WITH u,l CREATE (u)-[:TWEETED_AT]->(l);");
+    }
+
+    // TODO: Add frequency count
+    private void addTopics(ArrayList<String> topics, int userID, double tweetID) {
+
+        for(int i = 0; i < topics.size(); i++) {
+
+
+            // check if topic has been mentioned by the user
+            send("MATCH (u:User)-[:MENTIOINED]-(t:Topic) WHERE u.id = " + userID + " AND t.topic = '" + topics.get(i) +
+                    "' RETURN t");
+
+            // if the user has mentioned the topic before then simply create a new relationship between the topic and the new location
+            if (lastResponse.didReceiveData) {
+                send("MATCH (u:User)-[:MENTIOINED]-(t:Topic) WHERE u.id = " + userID + " AND t.topic = '" + topics.get(i) +
+                        "' WITH t MATCH (l:Location) WHERE l.id = " + tweetID + " WITH t,l CREATE (t)-[:MENTIONED_AT]->(l);");
+            }
+
+            // if not then check whether the topic exists nearby
+            else {
+
+                // check whether the topic exists nearby
+                send("MATCH (t:Topic)-[:MENTIONED_AT]-(l1:Location)-[:CLOSE_TO]-(l2:Location) WHERE t.topic = '" + topics.get(i) +
+                        "' AND l2.id = " + tweetID + " RETURN t;");
+
+                // if it does then create a new relationship between the (user -> topic) and (location -> topic)
+                if (lastResponse.didReceiveData) {
+                    send("MATCH (t:Topic)-[:MENTIONED_AT]-(l1:Location)-[:CLOSE_TO]-(l2:Location) WHERE t.topic = '" + topics.get(i) +
+                            "' AND l2.id = " + tweetID + " WITH t, l2 CREATE UNIQUE (t)-[:MENTIONED_AT]->(l2);");
+
+                    send("MATCH (t:Topic)-[:MENTIONED_AT]-(l:Location) WHERE t.topic = '" + topics.get(i) + "' AND l.id = " + tweetID +
+                            " WITH t MATCH (u:User) WHERE u.id = " + userID + " WITH t,u CREATE UNIQUE (u)-[:MENTIONED]->(t)");
+                }
+
+                // if it doesn't then we need to create a new node and attach it to the location and the user
+                else {
+
+                    // create topic node and connect it to the location it was mentioned at
+                    send("MATCH (l:Location) WHERE l.id = " + tweetID + " WITH l CREATE UNIQUE (t:Topic {topic: '" + topics.get(i) +
+                            "'})-[:MENTIONED_AT]-(l);");
+
+                    // connect the topic to the user who mentioned it
+                    send("MATCH (u:User)-[:TWEETED_AT]-(l:Location)-[:MENTIONED_AT]-(t:Topic) WHERE u.id = " + userID +
+                            " AND l.id = " + tweetID + " AND t.topic = '" + topics.get(i) + "' WITH u,t CREATE UNIQUE (u)-[:MENTIONED]->(t);");
+                }
+
+            }
         }
     }
 
-    private void addTopic(String t, double tweetID) {
-        String topic = "CREATE (newTopic:Topic {topic: '" + t + "', tweetID: " + tweetID + "});";
-        send(topic);
+    private void relateUsersByTopic(int userID) {
+        send("MATCH (u1:User)-[:MENTIONED]-(t:Topic)-[:MENTIONED]-(u2:User) WHERE u1.id = " + userID +
+                " WITH u1,u2 CREATE UNIQUE (u1)-[:TOPIC_CORRELATED]-(u2);");
     }
+
+    private void relateTopicsByUser(int userID) {
+        send("MATCH (t1:Topic)-[:MENTIONED]-(u1:User)-[:TOPIC_CORRELATED]-(u2:User)-[:MENTIONED]-(t2:Topic) WHERE u1.id = " + userID +
+                " AND t1 <> t2 WITH t1, t2 CREATE UNIQUE (t1)-[:USER_CORRELATED]-(t2)");
+    }
+
+
 
     // TODO: Organize data into neo4j
     public void addTweet(Tweet t) {
@@ -130,15 +201,29 @@ public class TxHandler {
         String username = t.getUsername();
         int userID = t.getUserID();
         String text = t.getText();
+        text = text.replace("'","");
         double latitude = t.getLatitude();
         double longitude = t.getLongitude();
         ArrayList<String> topics = t.getTopics();
 
-        addLocation(text, tweetID, latitude, longitude);
+        // stop here if the tweet/location already exists
+        if(!addLocation(text,tweetID,latitude,longitude))
+            return;
+
+        // create a CLOSE_TO relationship with nearby locations (.25 bounding box)
+        relateLocations(tweetID,latitude,longitude);
+
+        // adds a new user if user is not already present in database
         addUser(username,userID);
-//        for(String topic : topics) {
-//            addTopic(topic, tweetID);
-//        }
+
+        // create a TWEETED_AT relationship between user and location
+        relateUserToLocation(userID,tweetID);
+
+        addTopics(topics,userID,tweetID);
+
+        relateUsersByTopic(userID);
+
+        relateTopicsByUser(userID);
 
     }
 
@@ -377,6 +462,8 @@ public class TxHandler {
                 didReceiveData = !data.isEmpty();
             }
         }
+
+        public JSONArray getData() { return data; }
 
     }
 

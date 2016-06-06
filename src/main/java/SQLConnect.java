@@ -60,7 +60,8 @@ public class SQLConnect {
 //            System.out.println("Done");
 //        }
 
-        extractData("ht_OaklandSolidarity");
+        //extractData("ht_OaklandSolidarity");
+        extractData("ht_OccupyBaltimore");
 
 
     }
