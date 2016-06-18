@@ -61,7 +61,8 @@ public class SQLConnect {
 //        }
 
         //extractData("ht_OaklandSolidarity");
-        extractData("ht_OccupyBaltimore");
+        //extractData("ht_OccupyBaltimore");
+        extractData("ht_kimjong");
 
 
     }

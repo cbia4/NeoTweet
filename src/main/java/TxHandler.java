@@ -33,8 +33,6 @@ public class TxHandler {
         lastResponse = null;
         currentID = 0;
 
-        send("MATCH (n:Location) RETURN max(n.location_id);");
-
     }
 
     /* gets max Location ID from neo4j and increments by 1 */
@@ -67,7 +65,7 @@ public class TxHandler {
         /* POST event */
         ClientResponse response = resource
                 .accept( MediaType.APPLICATION_JSON )
-                .type( MediaType.APPLICATION_JSON)
+                .type( MediaType.APPLICATION_JSON )
                 .entity( payload )
                 .post( ClientResponse.class );
 
@@ -133,20 +131,20 @@ public class TxHandler {
                 " WITH u,l CREATE (u)-[:TWEETED_AT]->(l);");
     }
 
-    // TODO: Add frequency count
     private void addTopics(ArrayList<String> topics, int userID, double tweetID) {
 
         for(int i = 0; i < topics.size(); i++) {
 
-
             // check if topic has been mentioned by the user
-            send("MATCH (u:User)-[:MENTIOINED]-(t:Topic) WHERE u.id = " + userID + " AND t.topic = '" + topics.get(i) +
-                    "' RETURN t");
+            send("MATCH (u:User)-[:MENTIONED]-(t:Topic) WHERE u.id = " + userID + " AND t.topic = '" + topics.get(i) +
+                    "' RETURN u,t;");
 
             // if the user has mentioned the topic before then simply create a new relationship between the topic and the new location
+            // and also bump the frequency count of that topic and times the user has mentioned it
             if (lastResponse.didReceiveData) {
-                send("MATCH (u:User)-[:MENTIOINED]-(t:Topic) WHERE u.id = " + userID + " AND t.topic = '" + topics.get(i) +
-                        "' WITH t MATCH (l:Location) WHERE l.id = " + tweetID + " WITH t,l CREATE (t)-[:MENTIONED_AT]->(l);");
+                send("MATCH (u:User)-[m:MENTIONED]-(t:Topic) WHERE u.id = " + userID + " AND t.topic = '" + topics.get(i) +
+                        "' WITH t,m MATCH (l:Location) WHERE l.id = " + tweetID + " WITH t,l,m CREATE (t)-[:MENTIONED_AT]->(l) " +
+                        " SET t.frequency = t.frequency + 1 SET m.weight = m.weight + 1;");
             }
 
             // if not then check whether the topic exists nearby
@@ -156,25 +154,45 @@ public class TxHandler {
                 send("MATCH (t:Topic)-[:MENTIONED_AT]-(l1:Location)-[:CLOSE_TO]-(l2:Location) WHERE t.topic = '" + topics.get(i) +
                         "' AND l2.id = " + tweetID + " RETURN t;");
 
-                // if it does then create a new relationship between the (user -> topic) and (location -> topic)
+                // if it does then create a new relationship between the (user -> topic) and (topic -> location)
                 if (lastResponse.didReceiveData) {
+
+                    // create new (topic -> location)
                     send("MATCH (t:Topic)-[:MENTIONED_AT]-(l1:Location)-[:CLOSE_TO]-(l2:Location) WHERE t.topic = '" + topics.get(i) +
                             "' AND l2.id = " + tweetID + " WITH t, l2 CREATE UNIQUE (t)-[:MENTIONED_AT]->(l2);");
 
+                    // create new (user -> topic)
                     send("MATCH (t:Topic)-[:MENTIONED_AT]-(l:Location) WHERE t.topic = '" + topics.get(i) + "' AND l.id = " + tweetID +
-                            " WITH t MATCH (u:User) WHERE u.id = " + userID + " WITH t,u CREATE UNIQUE (u)-[:MENTIONED]->(t)");
+                            " WITH t MATCH (u:User) WHERE u.id = " + userID + " WITH t,u CREATE UNIQUE (u)-[:MENTIONED {weight: 1}]->(t)");
+
+                    // update frequency
+                    send("MATCH (t:Topic)-[:MENTIONED_AT]-(l:Location) WHERE t.topic = '" + topics.get(i) + "' AND l.id = " + tweetID +
+                            " SET t.frequency = t.frequency + 1;");
                 }
 
                 // if it doesn't then we need to create a new node and attach it to the location and the user
                 else {
 
+                    int tid = 1;
+
+                    // get the maximum topic id and add to it
+                    send("MATCH (t:Topic) RETURN max(t.id);");
+                    JSONArray response = lastResponse.data;
+                    JSONObject obj = (JSONObject) response.get(0);
+                    response = (JSONArray) obj.get("row");
+                    if(response.get(0) != null) {
+                        tid = Integer.parseInt(response.get(0).toString()) + 1;
+                    }
+
+
+
                     // create topic node and connect it to the location it was mentioned at
                     send("MATCH (l:Location) WHERE l.id = " + tweetID + " WITH l CREATE UNIQUE (t:Topic {topic: '" + topics.get(i) +
-                            "'})-[:MENTIONED_AT]-(l);");
+                            "', frequency: 1, id: " + tid + "})-[:MENTIONED_AT]-(l);");
 
                     // connect the topic to the user who mentioned it
                     send("MATCH (u:User)-[:TWEETED_AT]-(l:Location)-[:MENTIONED_AT]-(t:Topic) WHERE u.id = " + userID +
-                            " AND l.id = " + tweetID + " AND t.topic = '" + topics.get(i) + "' WITH u,t CREATE UNIQUE (u)-[:MENTIONED]->(t);");
+                            " AND l.id = " + tweetID + " AND t.topic = '" + topics.get(i) + "' WITH u,t CREATE UNIQUE (u)-[:MENTIONED {weight: 1}]->(t);");
                 }
 
             }
@@ -182,18 +200,87 @@ public class TxHandler {
     }
 
     private void relateUsersByTopic(int userID) {
+        JSONArray response1, response2;
+
+        // get all users that are connected by a topic to the current user
         send("MATCH (u1:User)-[:MENTIONED]-(t:Topic)-[:MENTIONED]-(u2:User) WHERE u1.id = " + userID +
-                " WITH u1,u2 CREATE UNIQUE (u1)-[:TOPIC_CORRELATED]-(u2);");
+                " RETURN DISTINCT u2;");
+
+        response1 = lastResponse.data;
+
+        for(int i = 0; i < response1.size(); i++) {
+            JSONObject obj = (JSONObject) response1.get(i);
+            JSONArray row = (JSONArray) obj.get("row");
+            obj = (JSONObject) row.get(0);
+            int u2ID = Integer.parseInt(obj.get("id").toString());
+            send("MATCH (u1:User)-[:MENTIONED]-(t:Topic)-[:MENTIONED]-(u2:User) WHERE u1.id = " + userID +
+                    " AND u2.id = " + u2ID + " RETURN count(t);");
+
+            response2 = lastResponse.data;
+            obj = (JSONObject) response2.get(0);
+            row = (JSONArray) obj.get("row");
+            int topicCount = Integer.parseInt(row.get(0).toString());
+
+            send("MATCH (u1:User)-[tc:TOPIC_CORRELATED]-(u2:User) WHERE u1.id = " + userID +
+                    " AND u2.id = " + u2ID + " SET tc.weight = " + topicCount + " RETURN tc;");
+
+            if(!lastResponse.didReceiveData) {
+                send("MATCH (u1:User)-[:MENTIONED]-(t:Topic)-[:MENTIONED]-(u2:User) WHERE u1.id = " + userID +
+                        " AND u2.id = " + u2ID + " WITH u1,u2 CREATE UNIQUE (u1)-[:TOPIC_CORRELATED {weight: " + topicCount +
+                        "}]-(u2);");
+            }
+        }
     }
 
-    private void relateTopicsByUser(int userID) {
-        send("MATCH (t1:Topic)-[:MENTIONED]-(u1:User)-[:TOPIC_CORRELATED]-(u2:User)-[:MENTIONED]-(t2:Topic) WHERE u1.id = " + userID +
-                " AND t1 <> t2 WITH t1, t2 CREATE UNIQUE (t1)-[:USER_CORRELATED]-(t2)");
+    private void relateTopicsByUser(int userID, ArrayList<String> topics) {
+
+        for(int i = 0; i < topics.size(); i++) {
+            // get topic id
+            send("MATCH (u:User)-[:MENTIONED]-(t:Topic) WHERE u.id = " + userID + " AND t.topic = '" + topics.get(i) + "' RETURN t;");
+
+            JSONObject obj = (JSONObject) lastResponse.data.get(0);
+            JSONArray row = (JSONArray) obj.get("row");
+            obj = (JSONObject) row.get(0);
+            int tid = Integer.parseInt(obj.get("id").toString());
+
+            // get all topics related to the current topic by a user
+            send("MATCH (t1:Topic)-[:MENTIONED]-(u:User)-[:MENTIONED]-(t2:Topic) WHERE t1.id = " + tid +
+                    " RETURN DISTINCT t2;");
+
+            // if there was no data returned, then there are no relationships to update or create
+            if(!lastResponse.didReceiveData)
+                continue;
+
+            for(int j = 0; j < lastResponse.data.size(); j++) {
+
+                obj = (JSONObject) lastResponse.data.get(j);
+                row = (JSONArray) obj.get("row");
+                obj = (JSONObject) row.get(0);
+                int t2id = Integer.parseInt(obj.get("id").toString());
+
+                // count how many users relate the topics to each other
+                send("MATCH (t1:Topic)-[:MENTIONED]-(u:User)-[:MENTIONED]-(t2:Topic) WHERE t1.id = " + tid +
+                        " AND t2.id = " + t2id + " RETURN count(u);");
+
+                obj = (JSONObject) lastResponse.data.get(0);
+                row = (JSONArray) obj.get("row");
+                int userCount = Integer.parseInt(row.get(0).toString());
+
+                // update the edge weight for the user_correlated relationship
+                send("MATCH (t1:Topic)-[uc:USER_CORRELATED]-(t2:Topic) WHERE t1.id = " + tid +
+                        " AND t2.id = " + t2id + " SET uc.weight = " + userCount + " RETURN uc;");
+
+                // if no edge exists, create one
+                if(!lastResponse.didReceiveData) {
+                    send("MATCH (t1:Topic)-[:MENTIONED]-(u:User)-[:MENTIONED]-(t2:Topic) WHERE t1.id = " + tid +
+                            " AND t2.id = " + t2id + " WITH t1,t2 CREATE UNIQUE (t1)-[:USER_CORRELATED {weight: " + userCount +
+                            "}]-(t2);");
+                }
+
+            }
+        }
     }
 
-
-
-    // TODO: Organize data into neo4j
     public void addTweet(Tweet t) {
 
         // unmarshal arguments
@@ -219,11 +306,14 @@ public class TxHandler {
         // create a TWEETED_AT relationship between user and location
         relateUserToLocation(userID,tweetID);
 
+        // Add topics and relate them to users and locations accordingly
         addTopics(topics,userID,tweetID);
 
+        // Relate users to each other if they are talking about the same topic
         relateUsersByTopic(userID);
 
-        relateTopicsByUser(userID);
+        // Relate topics together if their users are related by a topic
+        relateTopicsByUser(userID,topics);
 
     }
 
