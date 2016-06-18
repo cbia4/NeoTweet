@@ -26,7 +26,8 @@ import java.util.concurrent.LinkedBlockingDeque;
  * Connects to twitter data stream and adds users
  * and tweets to neo4j
  */
-public class TwitterStream {
+
+class TwitterStream {
 
     private static Authentication auth;
     private static JSONParser parser;
@@ -35,7 +36,7 @@ public class TwitterStream {
     //private static Logger logger;
 
 
-    public TwitterStream() {
+    TwitterStream() {
 
         String[] oauth = new String[4];
         File configFile = new File("/Users/colinbiafore/Desktop/research/db_resources/oauth.txt");
@@ -78,7 +79,7 @@ public class TwitterStream {
     }
 
     /* Connects to twitter through a Status Filter Endpoint */
-    public void fetch(String countString) {
+    void fetch(String countString) {
 
 
         int count = Integer.parseInt(countString);

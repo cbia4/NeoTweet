@@ -2,15 +2,15 @@
  * Created by colinbiafore on 1/24/16.
  * Creates a Neo4J Client
  * Client is able to interact with Neo4J and fetch tweets from Twitter
+ * Client can also connect to MySQL and read table rows into neo4j
  */
 
 import java.util.*;
 import java.io.*;
-import java.util.concurrent.SynchronousQueue;
 
 public class NeoTweet {
 
-    public static void printInstructions() {
+    private static void printInstructions() {
         System.out.println("Options:");
         System.out.println("1) Fetch Tweets from Twitter's Public Data Stream");
         System.out.println("2) Transfer tweets from MySQL to neo4j");

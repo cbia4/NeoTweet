@@ -2,8 +2,10 @@ import java.util.ArrayList;
 
 /**
  * Created by colinbiafore on 5/28/16.
+ * A class to store relevant tweet data
  */
-public class Tweet {
+
+class Tweet {
 
     private double tweetID;
     private String username;
@@ -13,7 +15,7 @@ public class Tweet {
     private double longitude;
     private ArrayList<String> topics;
 
-    public Tweet(double tweetID, String username, int userID, String text,
+    Tweet(double tweetID, String username, int userID, String text,
                  ArrayList<Double> coordinates, ArrayList<String> topics) {
 
         this.tweetID = tweetID;
@@ -26,13 +28,13 @@ public class Tweet {
 
     }
 
-    public double getTweetID() { return tweetID; }
-    public String getUsername() { return username; }
-    public int getUserID() { return userID; }
-    public String getText() { return text; }
-    public double getLatitude() { return latitude; }
-    public double getLongitude() { return longitude; }
-    public ArrayList<String> getTopics() { return topics; }
+    double getTweetID() { return tweetID; }
+    String getUsername() { return username; }
+    int getUserID() { return userID; }
+    String getText() { return text; }
+    double getLatitude() { return latitude; }
+    double getLongitude() { return longitude; }
+    ArrayList<String> getTopics() { return topics; }
 
     public void printData() {
         System.out.println("--------------------------------------");

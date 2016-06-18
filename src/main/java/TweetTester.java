@@ -1,17 +1,19 @@
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Scanner;
 
 /**
  * Created by colinbiafore on 6/1/16.
+ * A class that allows manual entry of twitter data to neo4j
  */
-public class TweetTester {
+
+class TweetTester {
 
 
-    TxHandler tx;
-    Scanner sc;
+    private TxHandler tx;
+    private Scanner sc;
 
-
-    public TweetTester() {
+    TweetTester() {
         tx = new TxHandler();
         sc = new Scanner(System.in);
     }
@@ -42,15 +44,13 @@ public class TweetTester {
         String topicString = sc.nextLine();
         String[] topicList = topicString.split(" ");
         ArrayList<String> topics = new ArrayList<String>();
-        for(int i = 0; i < topicList.length; i++) {
-            topics.add(topicList[i]);
-        }
+        Collections.addAll(topics, topicList);
+
 
         System.out.print("Confirm adding tweet? (1=yes, 2=no): ");
         int opt = sc.nextInt();
         if(opt == 1) {
-            Tweet t = new Tweet(tweetID, username, userID, text, coordinates, topics);
-            return t;
+            return new Tweet(tweetID, username, userID, text, coordinates, topics);
         } else {
             return null;
         }
@@ -67,7 +67,7 @@ public class TweetTester {
     }
 
 
-    public void run() {
+    void run() {
 
         boolean inSession = true;
         Tweet t;
@@ -78,7 +78,6 @@ public class TweetTester {
             printInstructions();
             System.out.print("-> ");
             opt = sc.nextInt();
-
 
             if(opt == 1) {
                 t = createNewTweet();

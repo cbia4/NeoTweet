@@ -1,12 +1,14 @@
 /**
  * Created by colinbiafore on 5/24/16.
+ * A class that connects to a MySQL database and retrieves tweets, parses for topics, etc.
+ * and passes them to neo4j tx_handler
  */
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.io.*;
 
-public class SQLConnect {
+class SQLConnect {
 
     private String url;
     private String username;
@@ -17,7 +19,7 @@ public class SQLConnect {
     private static final int NUM_TABLES = 1231;
 
     // Constructor
-    public SQLConnect(String url, String username, String password) {
+    SQLConnect(String url, String username, String password) {
         this.url = url;
         this.username = username;
         this.password = password;
@@ -28,7 +30,7 @@ public class SQLConnect {
     }
 
     // Load JDBC driver and connect to MySQL database
-    public void connect() {
+    void connect() {
 
         // Attempt to load the JDBC driver
         System.out.println("Loading driver...");
@@ -51,7 +53,7 @@ public class SQLConnect {
     }
 
     // Transfer tweets from MySQL to neo4j
-    public void transferData() {
+    void transferData() {
         getTablesFromFile();
         // TODO: Uncomment this section once a smaller dataset has been tested
 //        for(int i = 0; i < NUM_TABLES; i++) {
@@ -144,6 +146,7 @@ public class SQLConnect {
         String[] words = s.split(" ");
         for(String word : words) {
             if(word.length() > 0 && word.charAt(0) == '#') {
+                word = word.replace("'","");
                 topics.add(word.substring(1));
             }
         }

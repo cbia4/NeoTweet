@@ -4,18 +4,17 @@ import java.util.*;
 
 
 
-
-public class NeoClient {
+class NeoClient {
 
     private TxHandler neoTx;
     private TwitterStream stream;
 
-    public NeoClient() {
+    NeoClient() {
         neoTx = new TxHandler();
         stream = new TwitterStream();
     }
 
-    public void printInstructions() {
+    void printInstructions() {
         System.out.println("--------------------------------------------");
         System.out.println("Options:");
         System.out.println("FETCH <count>");
@@ -27,7 +26,7 @@ public class NeoClient {
         System.out.println();
     }
 
-    public void getInput() {
+    void getInput() {
 
         Scanner sc = new Scanner(System.in);
         String input;

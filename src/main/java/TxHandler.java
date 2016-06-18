@@ -13,9 +13,10 @@ import java.util.ArrayList;
 
 /**
  * A class to manage interaction with the Neo4j server
+ * and intelligently add nodes and edges to the social graph
  */
 
-public class TxHandler {
+class TxHandler {
 
     private static final String SERVER_ROOT_URI = "http://localhost:7474/db/data/";
     private static JSONParser parser;
@@ -26,7 +27,7 @@ public class TxHandler {
 
 
     /* TxHandler Constructor */
-    public TxHandler() {
+    TxHandler() {
         parser = new JSONParser();
         lastResponseMessage = "";
         lastResponseStatus = 0;
@@ -89,7 +90,7 @@ public class TxHandler {
     }
 
     /* Public method to send a query to neo4j */
-    public void query(final String query) {
+    void query(final String query) {
         send(query);
         if(lastResponse.didReceiveData) {
             System.out.println("neo4j response: " + lastResponse.data);
@@ -133,16 +134,16 @@ public class TxHandler {
 
     private void addTopics(ArrayList<String> topics, int userID, double tweetID) {
 
-        for(int i = 0; i < topics.size(); i++) {
+        for(String topic : topics) {
 
             // check if topic has been mentioned by the user
-            send("MATCH (u:User)-[:MENTIONED]-(t:Topic) WHERE u.id = " + userID + " AND t.topic = '" + topics.get(i) +
+            send("MATCH (u:User)-[:MENTIONED]-(t:Topic) WHERE u.id = " + userID + " AND t.topic = '" + topic +
                     "' RETURN u,t;");
 
             // if the user has mentioned the topic before then simply create a new relationship between the topic and the new location
             // and also bump the frequency count of that topic and times the user has mentioned it
             if (lastResponse.didReceiveData) {
-                send("MATCH (u:User)-[m:MENTIONED]-(t:Topic) WHERE u.id = " + userID + " AND t.topic = '" + topics.get(i) +
+                send("MATCH (u:User)-[m:MENTIONED]-(t:Topic) WHERE u.id = " + userID + " AND t.topic = '" + topic +
                         "' WITH t,m MATCH (l:Location) WHERE l.id = " + tweetID + " WITH t,l,m CREATE (t)-[:MENTIONED_AT]->(l) " +
                         " SET t.frequency = t.frequency + 1 SET m.weight = m.weight + 1;");
             }
@@ -151,22 +152,22 @@ public class TxHandler {
             else {
 
                 // check whether the topic exists nearby
-                send("MATCH (t:Topic)-[:MENTIONED_AT]-(l1:Location)-[:CLOSE_TO]-(l2:Location) WHERE t.topic = '" + topics.get(i) +
+                send("MATCH (t:Topic)-[:MENTIONED_AT]-(l1:Location)-[:CLOSE_TO]-(l2:Location) WHERE t.topic = '" + topic +
                         "' AND l2.id = " + tweetID + " RETURN t;");
 
                 // if it does then create a new relationship between the (user -> topic) and (topic -> location)
                 if (lastResponse.didReceiveData) {
 
                     // create new (topic -> location)
-                    send("MATCH (t:Topic)-[:MENTIONED_AT]-(l1:Location)-[:CLOSE_TO]-(l2:Location) WHERE t.topic = '" + topics.get(i) +
+                    send("MATCH (t:Topic)-[:MENTIONED_AT]-(l1:Location)-[:CLOSE_TO]-(l2:Location) WHERE t.topic = '" + topic +
                             "' AND l2.id = " + tweetID + " WITH t, l2 CREATE UNIQUE (t)-[:MENTIONED_AT]->(l2);");
 
                     // create new (user -> topic)
-                    send("MATCH (t:Topic)-[:MENTIONED_AT]-(l:Location) WHERE t.topic = '" + topics.get(i) + "' AND l.id = " + tweetID +
+                    send("MATCH (t:Topic)-[:MENTIONED_AT]-(l:Location) WHERE t.topic = '" + topic + "' AND l.id = " + tweetID +
                             " WITH t MATCH (u:User) WHERE u.id = " + userID + " WITH t,u CREATE UNIQUE (u)-[:MENTIONED {weight: 1}]->(t)");
 
                     // update frequency
-                    send("MATCH (t:Topic)-[:MENTIONED_AT]-(l:Location) WHERE t.topic = '" + topics.get(i) + "' AND l.id = " + tweetID +
+                    send("MATCH (t:Topic)-[:MENTIONED_AT]-(l:Location) WHERE t.topic = '" + topic + "' AND l.id = " + tweetID +
                             " SET t.frequency = t.frequency + 1;");
                 }
 
@@ -187,12 +188,12 @@ public class TxHandler {
 
 
                     // create topic node and connect it to the location it was mentioned at
-                    send("MATCH (l:Location) WHERE l.id = " + tweetID + " WITH l CREATE UNIQUE (t:Topic {topic: '" + topics.get(i) +
+                    send("MATCH (l:Location) WHERE l.id = " + tweetID + " WITH l CREATE UNIQUE (t:Topic {topic: '" + topic +
                             "', frequency: 1, id: " + tid + "})-[:MENTIONED_AT]-(l);");
 
                     // connect the topic to the user who mentioned it
                     send("MATCH (u:User)-[:TWEETED_AT]-(l:Location)-[:MENTIONED_AT]-(t:Topic) WHERE u.id = " + userID +
-                            " AND l.id = " + tweetID + " AND t.topic = '" + topics.get(i) + "' WITH u,t CREATE UNIQUE (u)-[:MENTIONED {weight: 1}]->(t);");
+                            " AND l.id = " + tweetID + " AND t.topic = '" + topic + "' WITH u,t CREATE UNIQUE (u)-[:MENTIONED {weight: 1}]->(t);");
                 }
 
             }
@@ -200,24 +201,20 @@ public class TxHandler {
     }
 
     private void relateUsersByTopic(int userID) {
-        JSONArray response1, response2;
 
         // get all users that are connected by a topic to the current user
         send("MATCH (u1:User)-[:MENTIONED]-(t:Topic)-[:MENTIONED]-(u2:User) WHERE u1.id = " + userID +
                 " RETURN DISTINCT u2;");
 
-        response1 = lastResponse.data;
-
-        for(int i = 0; i < response1.size(); i++) {
-            JSONObject obj = (JSONObject) response1.get(i);
+        for(Object o : lastResponse.data) {
+            JSONObject obj = (JSONObject) o;
             JSONArray row = (JSONArray) obj.get("row");
             obj = (JSONObject) row.get(0);
             int u2ID = Integer.parseInt(obj.get("id").toString());
             send("MATCH (u1:User)-[:MENTIONED]-(t:Topic)-[:MENTIONED]-(u2:User) WHERE u1.id = " + userID +
                     " AND u2.id = " + u2ID + " RETURN count(t);");
 
-            response2 = lastResponse.data;
-            obj = (JSONObject) response2.get(0);
+            obj = (JSONObject) lastResponse.data.get(0);
             row = (JSONArray) obj.get("row");
             int topicCount = Integer.parseInt(row.get(0).toString());
 
@@ -234,9 +231,12 @@ public class TxHandler {
 
     private void relateTopicsByUser(int userID, ArrayList<String> topics) {
 
-        for(int i = 0; i < topics.size(); i++) {
+        for(String topic : topics) {
             // get topic id
-            send("MATCH (u:User)-[:MENTIONED]-(t:Topic) WHERE u.id = " + userID + " AND t.topic = '" + topics.get(i) + "' RETURN t;");
+            send("MATCH (u:User)-[:MENTIONED]-(t:Topic) WHERE u.id = " + userID + " AND t.topic = '" + topic + "' RETURN t;");
+
+            if(!lastResponse.didReceiveData)
+                continue;
 
             JSONObject obj = (JSONObject) lastResponse.data.get(0);
             JSONArray row = (JSONArray) obj.get("row");
@@ -281,7 +281,8 @@ public class TxHandler {
         }
     }
 
-    public void addTweet(Tweet t) {
+    // Method is used by SQLConnect
+    void addTweet(Tweet t) {
 
         // unmarshal arguments
         double tweetID = t.getTweetID();
@@ -318,13 +319,14 @@ public class TxHandler {
     }
 
     /*
+     * Method is used by TwitterStream
      * Our graph has Places, Locations, and Topics
      * Places are CLOSE_TO other Places
      * Locations are IN Places
      * Topics are MENTIONED_AT Locations
      */
 
-    public void addTweet(String place, String fullPlace, double latitude, double longitude, String tweet, String[] topicArray) {
+    void addTweet(String place, String fullPlace, double latitude, double longitude, String tweet, String[] topicArray) {
 
         setMaxID();
 
@@ -431,86 +433,6 @@ public class TxHandler {
         return (Long) nodeDataObject.get("frequency") + 1;
     }
 
-    /* Sends a query that creates a new tweet@Location and relates it to other tweets around it */
-    public void createTweetAtLocation(String location, String fullLocation, String tweet, double latitude, double longitude) {
-        String locationQuery = "CREATE (new:Location {location:'" + location +
-                "', tweet:'" + tweet +
-                "', full_location:'" + fullLocation +
-                "', latitude:" + latitude +
-                " , longitude:" + longitude + " }) " +
-                "WITH new " +
-                "MATCH (n:Location) " +
-                "WHERE n.latitude < new.latitude + 0.5 " +
-                "AND n.latitude > new.latitude - 0.5 " +
-                "AND n.longitude > new.longitude - 0.5 " +
-                "AND n.longitude < new.longitude + 0.5 " +
-                "AND n <> new " +
-                "WITH abs(n.latitude - new.latitude) AS x, abs(n.longitude - new.longitude) AS y, n, new " +
-                "CREATE (new)-[r:CLOSE_TO {distance: sqrt((x*x) + (y*y))}]->(n);";
-
-        send(locationQuery);
-    }
-
-    /* Checks if a word is present near a location and either updates its frequency or creates a new node if the word is not present */
-    public void updateWordFrequencyAtLocation(String[] wordArray, String location, String fullLocation, double latitude, double longitude) {
-        double bound = 0.5;
-        double latLowerBound = latitude - bound;
-        double latUpperBound = latitude + bound;
-        double longLowerBound = longitude - bound;
-        double longUpperBound = longitude + bound;
-
-        String baseQuery;
-        String matchQuery;
-        String updateQuery;
-
-        for(String word : wordArray) {
-            word = word.toLowerCase();
-
-            baseQuery = "MATCH (n:Word) WHERE n.word = '" + word +
-                    "' AND n.latitude < " + latUpperBound +
-                    " AND n.latitude > " + latLowerBound +
-                    " AND n.longitude < " + longUpperBound +
-                    " AND n.longitude > " + longLowerBound;
-
-            matchQuery = baseQuery + " RETURN n;";
-            send(matchQuery);
-            if(lastResponse.didReceiveData) {
-                updateQuery = baseQuery + " SET n.frequency = n.frequency + 1;";
-                send(updateQuery);
-            } else {
-                addWordAtLocation(word, location, fullLocation,latitude,longitude);
-            }
-        }
-    }
-
-    /* Called in updateWordFrequencyAtLocation when no word was matched at the location */
-    private void addWordAtLocation(String word, String location, String fullLocation, double latitude, double longitude) {
-        int wordLength = word.length();
-        String query = "CREATE (new:Word {word:'" + word +
-                "', latitude: " + latitude +
-                ", longitude: " + longitude +
-                ", location: '" + location +
-                "', full_location: '" + fullLocation +
-                "', word_length: " + wordLength +
-                ", frequency: 1 } ) " +
-                "WITH new " +
-                "MATCH (n:Word) " +
-                "WHERE n.latitude < new.latitude + 0.5 " +
-                "AND n.latitude > new.latitude - 0.5 " +
-                "AND n.longitude > new.longitude - 0.5 " +
-                "AND n.longitude < new.longitude + 0.5 " +
-                "AND n <> new " +
-                "WITH abs(n.latitude - new.latitude) AS x, abs(n.longitude - new.longitude) AS y, n, new " +
-                "CREATE (new)-[r:CLOSE_TO {distance: sqrt((x*x) + (y*y))}]->(n) " +
-                "WITH new " +
-                "MATCH (m:Word) " +
-                "WHERE new.word = m.word AND new <> m " +
-                "CREATE UNIQUE (new)-[r:SAME]->(m);";
-
-        send(query);
-
-    }
-
     /* Parses neo4j response
      * Returns response object if successful
      * null if unsuccessful
@@ -532,12 +454,12 @@ public class TxHandler {
 
         private JSONArray data;
 
-        public boolean didReceiveError;
-        public boolean didReceiveData;
+        boolean didReceiveError;
+        boolean didReceiveData;
 
-        public String errorMessage;
+        String errorMessage;
 
-        public Neo4jResponse(JSONArray results, JSONArray errors) {
+        Neo4jResponse(JSONArray results, JSONArray errors) {
             if(!errors.isEmpty()) {
                 JSONObject messageObject = (JSONObject) errors.get(0);
                 errorMessage = messageObject.get("message").toString();
@@ -552,9 +474,6 @@ public class TxHandler {
                 didReceiveData = !data.isEmpty();
             }
         }
-
-        public JSONArray getData() { return data; }
-
     }
 
 
